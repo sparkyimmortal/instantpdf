@@ -1,162 +1,119 @@
-# InstantPDF
+# InstantPDF – Full-Stack PDF Tools Platform
 
-## After Downloading ZIP
+InstantPDF is a production-ready web application offering 20+ PDF tools such as merge, split, compress, OCR, convert, organize, watermark, rotate, and sign PDFs.
 
-Delete these files/folders before deploying:
-- `.replit` - Replit configuration
-- `replit.md` - Replit documentation
-- `.local/` - Replit state files
-- `.cache/` - Cache directory
-- `node_modules/` - Run `npm install` to regenerate
+This project is built as a real-world backend + DevOps showcase and is deployed on AWS EC2.
 
-In `vite.config.ts`, remove these imports and plugin entries:
-```ts
-// Remove these imports:
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
-import { cartographer } from "@replit/vite-plugin-cartographer";
-import devBanner from "@replit/vite-plugin-dev-banner";
+---
 
-// Remove from plugins array:
-runtimeErrorOverlay(),
-cartographer(),
-devBanner({ bannerColor: '#0ea5e9' }),
-```
+## Tech Stack
 
-In `package.json`, remove these devDependencies:
-```json
-"@replit/vite-plugin-cartographer": "...",
-"@replit/vite-plugin-dev-banner": "...",
-"@replit/vite-plugin-runtime-error-modal": "..."
-```
+Frontend:
+- React
+- Vite
+- Tailwind CSS
+- React Query
 
-## Overview
+Backend:
+- Node.js
+- Express
+- Go (PDF processing engine)
 
-InstantPDF is a full-stack web application providing a comprehensive suite of PDF manipulation tools. Users can merge, split, compress, convert, rotate, unlock, watermark, and perform many other PDF operations directly in the browser. The application follows a privacy-first approach where PDF files are processed in-memory and never stored on the server.
+Database:
+- PostgreSQL
+- Drizzle ORM
 
-**Domain**: instantpdf.in
+Infrastructure:
+- AWS EC2 (Ubuntu)
+- Linux system dependencies
+- GitHub (version control)
 
-## Features
+---
 
-- 25+ PDF manipulation tools
-- Modern responsive UI with dark/light theme
-- User authentication with role-based access
-- Usage limits (anonymous: 8/day, free: 15/day, pro: unlimited)
-- Admin dashboard with analytics
-- Privacy-first: No PDF files stored on server
+## Authentication & User Plans
 
-## System Architecture
+- JWT-based authentication
+- Password hashing using bcrypt
+- User roles:
+  - Anonymous
+  - Free
+  - Pro (expiry-based)
+  - Admin
 
-### Frontend
-- **Framework**: React 18 with TypeScript
-- **Routing**: Wouter (lightweight React router)
-- **State Management**: TanStack React Query
-- **Styling**: Tailwind CSS v4
-- **UI Components**: shadcn/ui with Radix UI primitives
-- **Animations**: Framer Motion
-- **Build Tool**: Vite
+Usage limits:
 
-### Backend
-- **Node.js Server**: Express.js for API routing and static files
-- **PDF Processing**: Go backend (`pdf-backend/`) for all PDF operations
-- **Proxy Pattern**: Express proxies `/api/pdf/*` to Go backend on port 8080
+Anonymous:
+- 8 operations per day
+- 5 MB max file size
+- 25 pages max
 
-### Database
-- **PostgreSQL** with Drizzle ORM
-- Tables: users, pdf_usage, pdf_operations, billing_settings
-- PDF Files: Processed in-memory only (never stored)
+Free:
+- 15 operations per day
+- 10 MB max file size
+- 40 pages max
 
-## Deployment Guide
+Pro:
+- Unlimited operations
+- Unlimited file size
+- Unlimited pages
 
-### Prerequisites
-- Node.js 18+
-- Go 1.21+
-- PostgreSQL 14+
-- System dependencies: Ghostscript, Poppler-utils
+---
 
-### Environment Variables
+## PDF Processing Engine (Go)
 
-Create a `.env` file:
+Heavy PDF operations are handled by a dedicated Go backend using:
 
-```env
-DATABASE_URL=postgresql://user:password@host:5432/instantpdf
-SESSION_SECRET=your-random-secret-here
-NODE_ENV=production
-```
+- pdfcpu
+- Ghostscript
+- Poppler-utils
+- OCRmyPDF
+- Tesseract OCR
+- LibreOffice
+- Chromium (headless)
 
-### Installation Steps
+This separation ensures high performance and stability.
 
-1. **Install Node.js dependencies**:
-   ```bash
-   npm install
-   ```
+---
 
-2. **Build Go backend**:
-   ```bash
-   cd pdf-backend
-   go build -o pdf-backend
-   cd ..
-   ```
+## Project Structure
 
-3. **Run database migrations**:
-   ```bash
-   npm run db:push
-   ```
+client/        - Frontend (React)
+server/        - Node.js API and authentication
+pdf-backend/   - Go PDF engine
+shared/        - Shared schemas and types
 
-4. **Build for production**:
-   ```bash
-   npm run build
-   ```
+---
 
-5. **Start the server**:
-   ```bash
-   npm start
-   ```
+## Environment Variables
 
-### Port Configuration
-- Frontend: Port 5000 (configurable)
-- Go Backend: Port 8080 (internal)
+Create a .env file with:
 
-## Admin Setup
+DATABASE_URL=postgresql://user:password@localhost:5432/instantpdf
+JWT_SECRET=your-secret
+PORT=3000
 
-To create an admin user, first register normally, then update via SQL:
-```sql
-UPDATE users SET role = 'admin' WHERE email = 'admin@example.com';
-```
+---
 
-### Admin Endpoints
-- `GET /api/admin/users` - List all users
-- `POST /api/admin/users/:id/plan` - Update user plan
-- `POST /api/admin/users/:id/disable` - Disable user
-- `POST /api/admin/users/:id/enable` - Enable user
+## Deployment
 
-## Future Integrations
+- Deployed on AWS EC2
+- PostgreSQL hosted on the same server
+- Linux system dependencies installed manually
+- Git-based deployment workflow
 
-### Stripe (Billing)
-- `billing_settings` table prepared with `stripe_enabled` flag (default: false)
-- Enable via admin endpoint when Stripe is configured
+---
 
-### Email (Contact Form)
-- Contact form shows success message but doesn't send emails yet
-- Add Resend or SendGrid when ready
+## DevOps Highlights
 
-## AWS Disaster Recovery
+- Linux server provisioning
+- Secure authentication and rate limiting
+- Database migrations
+- Process management ready (PM2)
+- CI/CD pipeline ready (GitHub Actions)
 
-See `docs/AWS_DISASTER_RECOVERY.md` for:
-- Daily encrypted PostgreSQL backups
-- Cross-account S3 storage
-- Restore procedures
+---
 
-## API Reference
+## Author
 
-PDF operations at `/api/pdf/`:
-- `/api/pdf/merge` - Combine PDFs
-- `/api/pdf/split` - Split PDF
-- `/api/pdf/compress` - Reduce file size
-- `/api/pdf/rotate` - Rotate pages
-- `/api/pdf/protect` - Add password
-- `/api/pdf/unlock` - Remove password
-- And 20+ more operations
-
-## License
-
-MIT
+Gourav  
+DevOps & Backend focused project

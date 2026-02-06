@@ -1,0 +1,30 @@
+# Node
+node_modules/
+dist/
+
+# Env
+.env
+
+# Replit
+.replit
+replit.nix
+replit.md
+
+# OS / Editor
+.DS_Store
+__MACOSX/
+.vscode/
+
+# Logs
+*.log
+
+# Go build
+pdf-backend/pdf-backend
+
+# Runtime / temp (CRITICAL)
+pdf-backend/work/
+
+# Temporary
+.cache/
+.local/
+.upm/

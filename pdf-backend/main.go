@@ -1800,15 +1800,33 @@ func handlePreview(w http.ResponseWriter, r *http.Request) {
                 pages = append(pages, previewPage{PageNumber: i, ImageURL: buildPreviewURL(r, jobID, filepath.Join("previews", fmt.Sprintf("page-%d.png", i)))})
         }
 
-        // Kick off background rendering for ALL pages (non-blocking), so previews are warm
-        // and never 404 on a clean machine.
-        go func(jobDir string) {
-                previewsDir := filepath.Join(jobDir, "previews")
-                _ = os.MkdirAll(previewsDir, 0o755)
-                prefix := filepath.Join(previewsDir, "page")
-                // 110 DPI is a good speed/quality compromise for card thumbnails.
-                _, _ = runCommandOutput(jobDir, "pdftoppm", "-png", "-r", "110", inPath, prefix)
-        }(dir)
+        // Render ALL pages synchronously so images are fully written before the
+        // frontend starts requesting them. This avoids the race condition where
+        // the browser fetches a partially-written PNG (shows half page / blank).
+        prefix := filepath.Join(previewsDir, "page")
+        if out, renderErr := runCommandOutput(dir, "pdftoppm", "-png", "-r", "110", inPath, prefix); renderErr != nil {
+                log.Printf("preview render error: %v output=%s", renderErr, out)
+        }
+
+        // pdftoppm may produce zero-padded filenames (page-01.png vs page-1.png).
+        // Normalise to the names the frontend expects (page-1.png, page-2.png, …).
+        for i := 1; i <= total; i++ {
+                expected := filepath.Join(previewsDir, fmt.Sprintf("page-%d.png", i))
+                if _, statErr := os.Stat(expected); statErr == nil {
+                        continue
+                }
+                padded := []string{
+                        filepath.Join(previewsDir, fmt.Sprintf("page-%02d.png", i)),
+                        filepath.Join(previewsDir, fmt.Sprintf("page-%03d.png", i)),
+                        filepath.Join(previewsDir, fmt.Sprintf("page-%04d.png", i)),
+                }
+                for _, p := range padded {
+                        if _, statErr := os.Stat(p); statErr == nil {
+                                _ = os.Rename(p, expected)
+                                break
+                        }
+                }
+        }
 
         writeJSON(w, http.StatusOK, previewResponse{Pages: pages})
 }

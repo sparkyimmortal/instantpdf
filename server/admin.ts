@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { db } from "./db";
-import { users, pdfOperations } from "@shared/schema";
+import { users, pdfOperations, contactSubmissions } from "@shared/schema";
 import { eq, desc, count, gte, and, sql } from "drizzle-orm";
 import { verifyToken, AuthRequest } from "./auth";
 import { getUsageStats, getRecentOperations } from "./pdfLimits";
@@ -305,6 +305,138 @@ export async function bulkEnableUsers(req: AdminRequest, res: Response) {
     res.json({ message: `${updated} users enabled`, updated });
   } catch (error) {
     console.error("Bulk enable users error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+export async function listContactSubmissions(req: AdminRequest, res: Response) {
+  try {
+    const submissions = await db
+      .select()
+      .from(contactSubmissions)
+      .orderBy(desc(contactSubmissions.createdAt))
+      .limit(200);
+
+    res.json({ submissions });
+  } catch (error) {
+    console.error("List contacts error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+export async function getContactSubmission(req: AdminRequest, res: Response) {
+  try {
+    const { id } = req.params;
+    const [submission] = await db
+      .select()
+      .from(contactSubmissions)
+      .where(eq(contactSubmissions.id, id))
+      .limit(1);
+
+    if (!submission) {
+      return res.status(404).json({ error: "Contact message not found" });
+    }
+
+    if (!submission.isRead) {
+      await db
+        .update(contactSubmissions)
+        .set({ isRead: true })
+        .where(eq(contactSubmissions.id, id));
+    }
+
+    res.json({ submission: { ...submission, isRead: true } });
+  } catch (error) {
+    console.error("Get contact error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+export async function updateContactStatus(req: AdminRequest, res: Response) {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!["new", "read", "replied", "archived"].includes(status)) {
+      return res.status(400).json({ error: "Invalid status" });
+    }
+
+    const updateData: any = { status };
+    if (status === "read") {
+      updateData.isRead = true;
+    }
+
+    await db
+      .update(contactSubmissions)
+      .set(updateData)
+      .where(eq(contactSubmissions.id, id));
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Update contact status error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+export async function toggleContactRead(req: AdminRequest, res: Response) {
+  try {
+    const { id } = req.params;
+    const { isRead } = req.body;
+
+    if (typeof isRead !== "boolean") {
+      return res.status(400).json({ error: "isRead must be a boolean" });
+    }
+
+    await db
+      .update(contactSubmissions)
+      .set({ isRead })
+      .where(eq(contactSubmissions.id, id));
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Toggle contact read error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+export async function replyToContact(req: AdminRequest, res: Response) {
+  try {
+    const { id } = req.params;
+    const { reply } = req.body;
+
+    if (!reply || typeof reply !== "string" || reply.trim().length === 0) {
+      return res.status(400).json({ error: "Reply message is required" });
+    }
+
+    const [submission] = await db
+      .select()
+      .from(contactSubmissions)
+      .where(eq(contactSubmissions.id, id))
+      .limit(1);
+
+    if (!submission) {
+      return res.status(404).json({ error: "Contact message not found" });
+    }
+
+    await db
+      .update(contactSubmissions)
+      .set({
+        adminReply: reply.trim(),
+        repliedAt: new Date(),
+        status: "replied",
+        isRead: true,
+      })
+      .where(eq(contactSubmissions.id, id));
+
+    const { sendAdminReplyEmail } = await import("./email");
+    sendAdminReplyEmail(
+      submission.email,
+      submission.subject || "Your message to InstantPDF",
+      reply.trim()
+    ).catch(() => {});
+
+    res.json({ success: true, message: "Reply sent" });
+  } catch (error) {
+    console.error("Reply to contact error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 }

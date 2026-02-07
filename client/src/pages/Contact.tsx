@@ -3,6 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { motion } from "framer-motion";
 import { ArrowLeft, Mail, MessageSquare, Send, Globe, Clock } from "lucide-react";
 import { Link } from "wouter";
@@ -13,6 +20,7 @@ export default function Contact() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [subject, setSubject] = useState("");
+  const [category, setCategory] = useState("general");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -20,19 +28,41 @@ export default function Contact() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    toast({
-      title: "Message Sent!",
-      description: "Thank you for contacting us. We'll get back to you soon.",
-    });
-    
-    setName("");
-    setEmail("");
-    setSubject("");
-    setMessage("");
-    setIsSubmitting(false);
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, subject, category, message, source: "web" }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Message Sent!",
+          description: "Thank you for contacting us. We'll get back to you soon.",
+        });
+        setName("");
+        setEmail("");
+        setSubject("");
+        setCategory("general");
+        setMessage("");
+      } else {
+        const data = await response.json();
+        toast({
+          title: "Error",
+          description: data.error || "Failed to send message. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "Error",
+        description: "Could not connect to server. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -138,15 +168,30 @@ export default function Contact() {
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Subject</label>
-                  <Input
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    placeholder="How can we help?"
-                    required
-                    data-testid="input-subject"
-                  />
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Subject</label>
+                    <Input
+                      value={subject}
+                      onChange={(e) => setSubject(e.target.value)}
+                      placeholder="How can we help?"
+                      data-testid="input-subject"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Category</label>
+                    <Select value={category} onValueChange={setCategory}>
+                      <SelectTrigger data-testid="select-category">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="general">General Inquiry</SelectItem>
+                        <SelectItem value="billing">Billing</SelectItem>
+                        <SelectItem value="bug">Bug Report</SelectItem>
+                        <SelectItem value="feature">Feature Request</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">Message</label>

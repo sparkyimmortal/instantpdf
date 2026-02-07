@@ -6,6 +6,7 @@ import { db } from "./db";
 import { users, pdfUsage, pdfOperations, registerSchema, loginSchema, changePasswordSchema, deleteAccountSchema } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { getUserOperations } from "./pdfLimits";
+import { sendWelcomeEmail } from "./email";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const SALT_ROUNDS = 10;
@@ -110,6 +111,8 @@ export async function register(req: Request, res: Response) {
       email: newUser.email,
       plan: newUser.plan,
     });
+
+    sendWelcomeEmail(newUser.email).catch(() => {});
 
     res.status(201).json({
       token,
@@ -283,6 +286,67 @@ export async function deleteAccount(req: AuthRequest, res: Response) {
     res.json({ message: "Account deleted successfully" });
   } catch (error) {
     console.error("Delete account error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+export async function forgotPassword(req: Request, res: Response) {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+
+    res.json({ message: "If an account with that email exists, a password reset link has been sent." });
+
+    if (!user) return;
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    await db.update(users).set({
+      resetToken,
+      resetTokenExpiresAt,
+    }).where(eq(users.id, user.id));
+
+    const { sendPasswordResetEmail } = await import("./email");
+    sendPasswordResetEmail(user.email, resetToken).catch(() => {});
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+export async function resetPassword(req: Request, res: Response) {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) {
+      return res.status(400).json({ error: "Token and password are required" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: "Password must be at least 6 characters" });
+    }
+
+    const [user] = await db.select().from(users).where(eq(users.resetToken, token)).limit(1);
+
+    if (!user || !user.resetTokenExpiresAt || user.resetTokenExpiresAt < new Date()) {
+      return res.status(400).json({ error: "Invalid or expired reset link" });
+    }
+
+    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+
+    await db.update(users).set({
+      passwordHash,
+      resetToken: null,
+      resetTokenExpiresAt: null,
+    }).where(eq(users.id, user.id));
+
+    res.json({ message: "Password has been reset successfully" });
+  } catch (error) {
+    console.error("Reset password error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 }

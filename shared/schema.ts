@@ -11,6 +11,8 @@ export const users = pgTable("users", {
   planExpiresAt: timestamp("plan_expires_at"),
   role: text("role").notNull().default("user"),
   isActive: boolean("is_active").notNull().default(true),
+  resetToken: text("reset_token"),
+  resetTokenExpiresAt: timestamp("reset_token_expires_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -75,3 +77,30 @@ export type BillingSetting = typeof billingSettings.$inferSelect;
 export const toggleStripeSchema = z.object({
   enabled: z.boolean(),
 });
+
+export const contactSubmissions = pgTable("contact_submissions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  subject: text("subject"),
+  message: text("message").notNull(),
+  source: text("source").notNull().default("web"),
+  category: text("category").notNull().default("general"),
+  status: text("status").notNull().default("new"),
+  isRead: boolean("is_read").notNull().default(false),
+  adminReply: text("admin_reply"),
+  repliedAt: timestamp("replied_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertContactSchema = createInsertSchema(contactSubmissions).omit({
+  id: true,
+  status: true,
+  isRead: true,
+  adminReply: true,
+  repliedAt: true,
+  createdAt: true,
+});
+
+export type InsertContact = z.infer<typeof insertContactSchema>;
+export type ContactSubmission = typeof contactSubmissions.$inferSelect;

@@ -30,7 +30,9 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, UserX, UserCheck, ArrowUp, ArrowDown, RefreshCw, Calendar, Activity, Users, FileText, Server, Download, CheckSquare } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Shield, UserX, UserCheck, ArrowUp, ArrowDown, RefreshCw, Calendar, Activity, Users, FileText, Server, Download, CheckSquare, MessageSquare, Mail, Eye, EyeOff, Reply, Smartphone, Globe, Tag, Send, X } from "lucide-react";
 
 interface AdminUser {
   id: string;
@@ -79,6 +81,21 @@ interface HealthStatus {
   timestamp: string;
 }
 
+interface ContactSubmission {
+  id: string;
+  name: string;
+  email: string;
+  subject: string | null;
+  message: string;
+  source: string;
+  category: string;
+  status: string;
+  isRead: boolean;
+  adminReply: string | null;
+  repliedAt: string | null;
+  createdAt: string;
+}
+
 export default function AdminDashboard() {
   const { user, token, isLoading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
@@ -91,6 +108,12 @@ export default function AdminDashboard() {
   const [upgradeDialog, setUpgradeDialog] = useState<{ open: boolean; userId: string; email: string }>({ open: false, userId: "", email: "" });
   const [validityDays, setValidityDays] = useState<string>("30");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [contacts, setContacts] = useState<ContactSubmission[]>([]);
+  const [viewingContact, setViewingContact] = useState<ContactSubmission | null>(null);
+  const [replyDialog, setReplyDialog] = useState<{ open: boolean; contact: ContactSubmission | null }>({ open: false, contact: null });
+  const [replyText, setReplyText] = useState("");
+  const [replyLoading, setReplyLoading] = useState(false);
+  const [contactFilter, setContactFilter] = useState<string>("all");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -105,7 +128,7 @@ export default function AdminDashboard() {
 
   const fetchAll = async () => {
     setLoading(true);
-    await Promise.all([fetchUsers(), fetchStats(), fetchActivity(), fetchHealth()]);
+    await Promise.all([fetchUsers(), fetchStats(), fetchActivity(), fetchHealth(), fetchContacts()]);
     setLoading(false);
   };
 
@@ -168,6 +191,102 @@ export default function AdminDashboard() {
       console.error("Failed to fetch health:", error);
     }
   };
+
+  const fetchContacts = async () => {
+    try {
+      const response = await fetch("/api/admin/contacts", {
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setContacts(data.submissions);
+      }
+    } catch (error) {
+      console.error("Failed to fetch contacts:", error);
+    }
+  };
+
+  const updateContactStatus = async (contactId: string, status: string) => {
+    try {
+      const response = await fetch(`/api/admin/contacts/${contactId}/status`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status }),
+        credentials: "include",
+      });
+      if (response.ok) {
+        toast({ title: "Success", description: `Contact marked as ${status}` });
+        fetchContacts();
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update contact", variant: "destructive" });
+    }
+  };
+
+  const toggleRead = async (contactId: string, isRead: boolean) => {
+    try {
+      const response = await fetch(`/api/admin/contacts/${contactId}/read`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ isRead }),
+        credentials: "include",
+      });
+      if (response.ok) {
+        fetchContacts();
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update read status", variant: "destructive" });
+    }
+  };
+
+  const sendReply = async () => {
+    if (!replyDialog.contact || !replyText.trim()) return;
+    setReplyLoading(true);
+    try {
+      const response = await fetch(`/api/admin/contacts/${replyDialog.contact.id}/reply`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reply: replyText }),
+        credentials: "include",
+      });
+      if (response.ok) {
+        toast({ title: "Reply sent", description: `Reply sent to ${replyDialog.contact.email}` });
+        setReplyDialog({ open: false, contact: null });
+        setReplyText("");
+        fetchContacts();
+      } else {
+        const data = await response.json();
+        toast({ title: "Error", description: data.error || "Failed to send reply", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to send reply", variant: "destructive" });
+    } finally {
+      setReplyLoading(false);
+    }
+  };
+
+  const categoryLabels: Record<string, string> = {
+    general: "General",
+    billing: "Billing",
+    bug: "Bug Report",
+    feature: "Feature Request",
+  };
+
+  const filteredContacts = contacts.filter(c => {
+    if (contactFilter === "all") return true;
+    if (contactFilter === "unread") return !c.isRead;
+    return c.category === contactFilter;
+  });
 
   const openUpgradeDialog = (userId: string, email: string) => {
     setUpgradeDialog({ open: true, userId, email });
@@ -386,9 +505,18 @@ export default function AdminDashboard() {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
+          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex">
             <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
             <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
+            <TabsTrigger value="contacts" data-testid="tab-contacts" className="gap-1">
+              <MessageSquare className="h-3 w-3" />
+              Contacts
+              {contacts.filter(c => c.status === "new").length > 0 && (
+                <Badge variant="destructive" className="ml-1 h-5 px-1.5 text-[10px]">
+                  {contacts.filter(c => c.status === "new").length}
+                </Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="activity" data-testid="tab-activity">Activity</TabsTrigger>
             <TabsTrigger value="system" data-testid="tab-system">System</TabsTrigger>
           </TabsList>
@@ -619,6 +747,156 @@ export default function AdminDashboard() {
               </Table>
             </div>
             <div className="text-sm text-muted-foreground">Total users: {users.length}</div>
+          </TabsContent>
+
+          <TabsContent value="contacts" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5" />
+                    Contact Messages
+                    {contacts.filter(c => !c.isRead).length > 0 && (
+                      <Badge variant="default" className="ml-1">{contacts.filter(c => !c.isRead).length} unread</Badge>
+                    )}
+                  </CardTitle>
+                  <div className="flex gap-2">
+                    <Select value={contactFilter} onValueChange={setContactFilter}>
+                      <SelectTrigger className="w-[140px] h-8" data-testid="select-contact-filter">
+                        <SelectValue placeholder="Filter" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Messages</SelectItem>
+                        <SelectItem value="unread">Unread</SelectItem>
+                        <SelectItem value="general">General</SelectItem>
+                        <SelectItem value="billing">Billing</SelectItem>
+                        <SelectItem value="bug">Bug Reports</SelectItem>
+                        <SelectItem value="feature">Feature Requests</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {filteredContacts.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    {contactFilter === "all" ? "No contact messages yet." : `No ${contactFilter} messages.`}
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredContacts.map((contact) => (
+                      <div
+                        key={contact.id}
+                        className={`p-4 rounded-lg border transition-colors ${!contact.isRead ? "border-cyan-500/30 bg-cyan-500/5" : "bg-muted/30"} ${viewingContact?.id === contact.id ? "ring-2 ring-cyan-500/50" : ""}`}
+                        data-testid={`contact-${contact.id}`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setViewingContact(viewingContact?.id === contact.id ? null : contact)}>
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              {!contact.isRead && <span className="w-2 h-2 rounded-full bg-cyan-500 flex-shrink-0" />}
+                              <span className={`font-semibold ${!contact.isRead ? "text-foreground" : "text-muted-foreground"}`}>{contact.name}</span>
+                              <Badge variant={contact.status === "new" ? "default" : contact.status === "replied" ? "outline" : "secondary"} className="text-[10px] px-1.5 py-0">
+                                {contact.status}
+                              </Badge>
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 gap-1">
+                                <Tag className="h-2.5 w-2.5" />
+                                {categoryLabels[contact.category] || contact.category}
+                              </Badge>
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 gap-1">
+                                {contact.source === "mobile" ? <Smartphone className="h-2.5 w-2.5" /> : <Globe className="h-2.5 w-2.5" />}
+                                {contact.source === "mobile" ? "Mobile" : "Web"}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                              <Mail className="h-3 w-3" />
+                              <a href={`mailto:${contact.email}`} className="hover:text-cyan-500" onClick={(e) => e.stopPropagation()}>{contact.email}</a>
+                              <span>·</span>
+                              <span>{formatDateTime(contact.createdAt)}</span>
+                            </div>
+                            {contact.subject && <p className="font-medium text-sm mb-1">{contact.subject}</p>}
+                            {viewingContact?.id !== contact.id && (
+                              <p className="text-sm text-muted-foreground truncate">{contact.message}</p>
+                            )}
+                          </div>
+                          <div className="flex gap-1 flex-shrink-0">
+                            <Button size="icon" variant="ghost" className="h-7 w-7" title={contact.isRead ? "Mark unread" : "Mark read"} onClick={() => toggleRead(contact.id, !contact.isRead)} data-testid={`button-toggle-read-${contact.id}`}>
+                              {contact.isRead ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" title="Reply" onClick={() => { setReplyDialog({ open: true, contact }); setReplyText(""); }} data-testid={`button-reply-${contact.id}`}>
+                              <Reply className="h-3.5 w-3.5" />
+                            </Button>
+                            {contact.status !== "archived" && (
+                              <Button size="icon" variant="ghost" className="h-7 w-7" title="Archive" onClick={() => updateContactStatus(contact.id, "archived")} data-testid={`button-archive-${contact.id}`}>
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        {viewingContact?.id === contact.id && (
+                          <div className="mt-3 pt-3 border-t space-y-3">
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Full Message</p>
+                              <p className="text-sm whitespace-pre-wrap">{contact.message}</p>
+                            </div>
+                            {contact.adminReply && (
+                              <div className="bg-cyan-500/5 border border-cyan-500/20 rounded-lg p-3">
+                                <p className="text-xs font-medium text-cyan-500 mb-1">Your Reply {contact.repliedAt && `· ${formatDateTime(contact.repliedAt)}`}</p>
+                                <p className="text-sm whitespace-pre-wrap">{contact.adminReply}</p>
+                              </div>
+                            )}
+                            <div className="flex gap-2">
+                              {contact.status === "new" && (
+                                <Button size="sm" variant="outline" onClick={() => updateContactStatus(contact.id, "read")}>Mark Read</Button>
+                              )}
+                              <Button size="sm" variant="outline" onClick={() => { setReplyDialog({ open: true, contact }); setReplyText(""); }}>
+                                <Reply className="h-3 w-3 mr-1" />
+                                {contact.adminReply ? "Reply Again" : "Reply"}
+                              </Button>
+                              {contact.status !== "archived" && (
+                                <Button size="sm" variant="ghost" onClick={() => updateContactStatus(contact.id, "archived")}>Archive</Button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Dialog open={replyDialog.open} onOpenChange={(open) => { if (!open) { setReplyDialog({ open: false, contact: null }); setReplyText(""); } }}>
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle>Reply to {replyDialog.contact?.name}</DialogTitle>
+                  <DialogDescription>
+                    Your reply will be sent to {replyDialog.contact?.email} via email.
+                  </DialogDescription>
+                </DialogHeader>
+                {replyDialog.contact && (
+                  <div className="space-y-4">
+                    <div className="bg-muted/50 rounded-lg p-3">
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Original Message</p>
+                      <p className="text-sm">{replyDialog.contact.message}</p>
+                    </div>
+                    <Textarea
+                      placeholder="Type your reply..."
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      rows={5}
+                      data-testid="textarea-reply"
+                    />
+                  </div>
+                )}
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => { setReplyDialog({ open: false, contact: null }); setReplyText(""); }}>Cancel</Button>
+                  <Button onClick={sendReply} disabled={replyLoading || !replyText.trim()} className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 border-0" data-testid="button-send-reply">
+                    {replyLoading ? "Sending..." : <><Send className="h-3 w-3 mr-1" /> Send Reply</>}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="activity" className="space-y-4">

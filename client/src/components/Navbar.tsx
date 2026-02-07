@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Zap, User, LogOut, Settings, Shield, LayoutDashboard } from "lucide-react";
+import { Menu, X, User, LogOut, Settings, Shield, LayoutDashboard } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
@@ -40,9 +40,7 @@ export function Navbar() {
       <nav className="border-b border-border/50 bg-background/95 backdrop-blur-sm sticky top-0 z-50 shadow-sm">
         <div className="container flex h-16 items-center px-4 md:px-6">
           <Link href="/" className="mr-6 flex items-center space-x-2 group">
-            <div className="bg-gradient-to-br from-cyan-500 to-blue-600 text-white p-1.5 rounded-lg shadow-lg shadow-cyan-500/30">
-              <Zap className="h-6 w-6" />
-            </div>
+            <img src="/logo.png" alt="InstantPDF" className="h-9 w-9 rounded-lg shadow-lg shadow-cyan-500/30 object-cover" />
             <span className="font-display font-bold text-xl tracking-tight bg-gradient-to-r from-cyan-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
               InstantPDF
             </span>

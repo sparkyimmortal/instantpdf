@@ -1,31 +1,30 @@
-version: "3.9"
-
 services:
   app:
     build: .
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://instantpdf_user:gouravgn11@db:5432/instantpdf
-      JWT_SECRET: ${JWT_SECRET}
-      NODE_ENV: production
-      PORT: 3000
-    depends_on:
-      db:
-        condition: service_healthy
+      - DATABASE_URL=${DATABASE_URL:-postgresql://instantpdf:instantpdf@db:5432/instantpdf}
+      - JWT_SECRET=${JWT_SECRET:-change-this-to-a-strong-random-secret}
+      - NODE_ENV=production
+      - PORT=3000
     restart: unless-stopped
-    shm_size: "256m"
+    shm_size: '256m'
 
   db:
     image: postgres:16-alpine
+    profiles:
+      - db
     environment:
-      POSTGRES_DB: instantpdf
-      POSTGRES_USER: instantpdf_user
-      POSTGRES_PASSWORD: gouravgn11
+      - POSTGRES_USER=instantpdf
+      - POSTGRES_PASSWORD=instantpdf
+      - POSTGRES_DB=instantpdf
     volumes:
       - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U instantpdf_user"]
+      test: ["CMD-SHELL", "pg_isready -U instantpdf"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -33,3 +32,17 @@ services:
 
 volumes:
   pgdata:
+
+
+# ──────────────────────────────────────────────────────────
+# USAGE:
+#
+# Option 1: With built-in PostgreSQL
+#   docker compose --profile db up -d --build
+#
+# Option 2: With external database (e.g. AWS RDS)
+#   DATABASE_URL=postgresql://user:pass@your-rds-host:5432/dbname \
+#   JWT_SECRET=your-secret \
+#   docker compose up -d --build
+#
+# ──────────────────────────────────────────────────────────

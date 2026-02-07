@@ -195,12 +195,12 @@ export function ToolGrid() {
             )}
           </div>
           
-          <div className="flex flex-nowrap sm:flex-wrap justify-start sm:justify-center gap-2 mt-6 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
+          <div className="flex flex-wrap justify-center gap-2 mt-6 pb-2">
             {categoryFilters.map((filter) => (
               <button
                 key={filter.id}
                 onClick={() => setSelectedCategory(filter.id)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
                   selectedCategory === filter.id
                     ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/25"
                     : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/50"

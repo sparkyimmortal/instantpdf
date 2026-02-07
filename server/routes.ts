@@ -3,10 +3,11 @@ import { type Server } from "http";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { spawn, ChildProcess } from "child_process";
 import path from "path";
-import { register, login, getMe, changePassword, authMiddleware, getMyOperations, deleteAccount } from "./auth";
+import { register, login, getMe, changePassword, authMiddleware, getMyOperations, deleteAccount, forgotPassword, resetPassword } from "./auth";
 import { checkPdfLimits, incrementUsage, getPdfLimitsData, logOperation, getUserLimits } from "./pdfLimits";
-import { requireAdmin, listUsers, updateUserPlan, disableUser, enableUser, getStats, getActivityLogs, getSystemHealth, exportUsers, bulkDisableUsers, bulkEnableUsers } from "./admin";
+import { requireAdmin, listUsers, updateUserPlan, disableUser, enableUser, getStats, getActivityLogs, getSystemHealth, exportUsers, bulkDisableUsers, bulkEnableUsers, listContactSubmissions, getContactSubmission, updateContactStatus, toggleContactRead, replyToContact } from "./admin";
 import { createCheckout, getStripeStatus, toggleStripe, initializeBillingSettingsIfMissing } from "./billing";
+import { submitContact } from "./contact";
 
 const GO_BACKEND_PORT = 8080;
 let goBackendProcess: ChildProcess | null = null;
@@ -223,6 +224,8 @@ export async function registerRoutes(
   app.post("/api/auth/change-password", authMiddleware, changePassword);
   app.get("/api/auth/my-operations", authMiddleware, getMyOperations);
   app.post("/api/auth/delete-account", authMiddleware, deleteAccount);
+  app.post("/api/auth/forgot-password", forgotPassword);
+  app.post("/api/auth/reset-password", resetPassword);
   app.get("/api/auth/limits", getUserLimits);
 
   app.get("/api/admin/users", requireAdmin as any, listUsers as any);
@@ -241,6 +244,13 @@ export async function registerRoutes(
   app.post("/api/admin/settings/stripe", requireAdmin as any, toggleStripe as any);
 
   app.post("/api/billing/create-checkout", createCheckout as any);
+
+  app.post("/api/contact", submitContact);
+  app.get("/api/admin/contacts", requireAdmin as any, listContactSubmissions as any);
+  app.get("/api/admin/contacts/:id", requireAdmin as any, getContactSubmission as any);
+  app.post("/api/admin/contacts/:id/status", requireAdmin as any, updateContactStatus as any);
+  app.post("/api/admin/contacts/:id/read", requireAdmin as any, toggleContactRead as any);
+  app.post("/api/admin/contacts/:id/reply", requireAdmin as any, replyToContact as any);
 
   process.on("SIGTERM", () => {
     if (goBackendProcess) {

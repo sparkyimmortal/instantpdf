@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://instantpdf.in/sitemap.xml
+
+Disallow: /admin
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /login
+Disallow: /signup

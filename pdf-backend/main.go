@@ -167,6 +167,8 @@ func main() {
 
         mux.HandleFunc("/api/pdf/markdown-to-pdf", handleMarkdownToPDF)
         mux.HandleFunc("/pdf/markdown-to-pdf", handleMarkdownToPDF)
+        mux.HandleFunc("/api/pdf/document-crop", handleDocumentCrop)
+        mux.HandleFunc("/pdf/document-crop", handleDocumentCrop)
         mux.HandleFunc("/api/pdf/url-to-pdf", handleURLToPDF)
         mux.HandleFunc("/pdf/url-to-pdf", handleURLToPDF)
 
@@ -324,6 +326,76 @@ func pageCountPDF(dir, inPath string) (int, error) {
                 }
         }
         return 0, fmt.Errorf("could not parse page count")
+}
+
+func handleDocumentCrop(w http.ResponseWriter, r *http.Request) {
+        if r.Method != http.MethodPost {
+                errorJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+                return
+        }
+        if err := r.ParseMultipartForm(64 << 20); err != nil {
+                errorJSON(w, http.StatusBadRequest, "invalid multipart form")
+                return
+        }
+
+        _, header, err := r.FormFile("image")
+        if err != nil {
+                errorJSON(w, http.StatusBadRequest, "image is required")
+                return
+        }
+
+        jobID, dir, err := newJobDir()
+        if err != nil {
+                errorJSON(w, http.StatusInternalServerError, "failed to create job")
+                return
+        }
+
+        ext := filepath.Ext(header.Filename)
+        if ext == "" {
+                ext = ".jpg"
+        }
+        inPath := filepath.Join(dir, "input"+ext)
+        if err := saveUploadedFile(header, inPath); err != nil {
+                errorJSON(w, http.StatusInternalServerError, "failed to save image")
+                return
+        }
+
+        outPath := filepath.Join(dir, "cropped.jpg")
+
+        // Use ImageMagick to auto-detect and crop the document:
+        // 1. -fuzz 15% allows for slight color variations in the background
+        // 2. -trim removes the background border
+        // 3. +repage resets the virtual canvas
+        // 4. -gravity center -extent to add a small margin back
+        if err := runCommand(dir, "convert", inPath,
+                "-fuzz", "20%",
+                "-trim",
+                "+repage",
+                "-bordercolor", "white",
+                "-border", "10",
+                "-quality", "95",
+                outPath); err != nil {
+                // If trim fails, try a simpler approach: just enhance contrast
+                log.Printf("document crop trim failed, trying fallback: %v", err)
+                if err2 := runCommand(dir, "convert", inPath,
+                        "-normalize",
+                        "-sharpen", "0x1",
+                        "-quality", "95",
+                        outPath); err2 != nil {
+                        log.Printf("document crop fallback also failed: %v", err2)
+                        errorJSON(w, http.StatusInternalServerError, "failed to crop document")
+                        return
+                }
+        }
+
+        // Check if the cropped image exists and is valid
+        if _, statErr := os.Stat(outPath); statErr != nil {
+                errorJSON(w, http.StatusInternalServerError, "cropped image not found")
+                return
+        }
+
+        outName := "cropped.jpg"
+        writeJSON(w, http.StatusOK, downloadResponse{DownloadURL: buildDownloadURL(r, jobID, outName)})
 }
 
 func handleRotate(w http.ResponseWriter, r *http.Request) {

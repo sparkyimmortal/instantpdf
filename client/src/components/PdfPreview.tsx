@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Loader2, FileText, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,75 @@ interface PdfPreviewProps {
   maxPages?: number;
   selectedPage?: number;
   onPageSelect?: (page: number) => void;
+}
+
+function PreviewImage({
+  src,
+  alt,
+  className,
+  testId,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+  testId?: string;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const handleError = useCallback(() => {
+    if (retryCount < 3) {
+      setTimeout(() => {
+        setRetryCount((c) => c + 1);
+        setError(false);
+      }, 1000 * (retryCount + 1));
+    } else {
+      setError(true);
+    }
+  }, [retryCount]);
+
+  const imgSrc = retryCount > 0 ? `${src}?r=${retryCount}` : src;
+
+  if (error) {
+    return (
+      <div
+        className={cn(
+          "flex items-center justify-center bg-muted/50 text-muted-foreground",
+          className
+        )}
+        style={{ minHeight: 120 }}
+      >
+        <FileText className="w-8 h-8" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      {!loaded && (
+        <div
+          className={cn(
+            "flex items-center justify-center bg-muted/30 animate-pulse",
+            className
+          )}
+          style={{ minHeight: 200 }}
+        >
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        </div>
+      )}
+      <img
+        src={imgSrc}
+        alt={alt}
+        className={cn(className, !loaded && "hidden")}
+        data-testid={testId}
+        onLoad={() => setLoaded(true)}
+        onError={handleError}
+        loading="eager"
+        decoding="async"
+      />
+    </div>
+  );
 }
 
 export function PdfPreview({
@@ -104,11 +173,11 @@ export function PdfPreview({
     return (
       <div className={cn("bg-muted/50 rounded-lg p-4", className)} data-testid="preview-single">
         <div className="relative">
-          <img
+          <PreviewImage
             src={page.imageUrl}
             alt={`Page ${page.pageNumber}`}
             className="w-full h-auto rounded border border-border shadow-sm"
-            data-testid={`preview-image-${page.pageNumber}`}
+            testId={`preview-image-${page.pageNumber}`}
           />
           {pages.length > 1 && (
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-background/90 rounded-full px-3 py-1 shadow">
@@ -156,7 +225,7 @@ export function PdfPreview({
           onClick={() => onPageSelect?.(page.pageNumber)}
           data-testid={`preview-page-${page.pageNumber}`}
         >
-          <img
+          <PreviewImage
             src={page.imageUrl}
             alt={`Page ${page.pageNumber}`}
             className="w-full h-auto"

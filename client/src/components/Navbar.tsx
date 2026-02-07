@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Menu, X, Zap, User, LogOut, Settings, Shield, LayoutDashboard } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
@@ -37,33 +37,13 @@ export function Navbar() {
 
   return (
     <>
-      <motion.nav 
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="border-b border-border/50 bg-gradient-to-r from-background/80 via-background/90 to-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/40 sticky top-0 z-50 shadow-lg shadow-black/5 dark:border-white/10"
-      >
+      <nav className="border-b border-border/50 bg-background/95 backdrop-blur-sm sticky top-0 z-50 shadow-sm">
         <div className="container flex h-16 items-center px-4 md:px-6">
           <Link href="/" className="mr-6 flex items-center space-x-2 group">
-            <motion.div 
-              className="relative bg-gradient-to-br from-cyan-500 to-blue-600 text-white p-1.5 rounded-lg shadow-lg shadow-cyan-500/30"
-              whileHover={{ scale: 1.1, rotate: 5 }}
-              whileTap={{ scale: 0.95 }}
-              animate={{ 
-                boxShadow: [
-                  "0 0 20px rgba(6, 182, 212, 0.3)",
-                  "0 0 30px rgba(6, 182, 212, 0.5)",
-                  "0 0 20px rgba(6, 182, 212, 0.3)"
-                ]
-              }}
-              transition={{ 
-                boxShadow: { duration: 2, repeat: Infinity, ease: "easeInOut" }
-              }}
-            >
+            <div className="bg-gradient-to-br from-cyan-500 to-blue-600 text-white p-1.5 rounded-lg shadow-lg shadow-cyan-500/30">
               <Zap className="h-6 w-6" />
-              <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-cyan-400/20 to-blue-500/20 animate-pulse" />
-            </motion.div>
-            <span className="font-display font-bold text-xl tracking-tight bg-gradient-to-r from-cyan-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent bg-[length:200%_auto] group-hover:animate-[gradient_3s_linear_infinite]">
+            </div>
+            <span className="font-display font-bold text-xl tracking-tight bg-gradient-to-r from-cyan-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
               InstantPDF
             </span>
           </Link>
@@ -136,45 +116,23 @@ export function Navbar() {
               onClick={() => setIsOpen(!isOpen)}
               data-testid="button-mobile-menu"
             >
-              <AnimatePresence mode="wait">
-                {isOpen ? (
-                  <motion.div
-                    key="close"
-                    initial={{ rotate: -90, opacity: 0 }}
-                    animate={{ rotate: 0, opacity: 1 }}
-                    exit={{ rotate: 90, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <X className="h-5 w-5" />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="menu"
-                    initial={{ rotate: 90, opacity: 0 }}
-                    animate={{ rotate: 0, opacity: 1 }}
-                    exit={{ rotate: -90, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <Menu className="h-5 w-5" />
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               <span className="sr-only">Toggle menu</span>
             </Button>
           </div>
         </div>
-      </motion.nav>
+      </nav>
 
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-background/80 md:hidden"
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
           onClick={() => setIsOpen(false)}
         />
       )}
 
       {isOpen && (
         <div
-          className="fixed top-16 right-0 bottom-0 z-50 w-full max-w-sm bg-background border-l border-border/50 p-6 shadow-2xl md:hidden animate-in slide-in-from-right duration-200"
+          className="fixed top-16 right-0 bottom-0 z-50 w-full max-w-sm bg-background border-l border-border/50 p-6 shadow-2xl md:hidden"
         >
           <nav className="flex flex-col space-y-2">
             {navLinks.map((link) => (

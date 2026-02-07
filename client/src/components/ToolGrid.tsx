@@ -7,11 +7,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 import { toolCategories, toolTips, useFavorites, type Tool } from "@/hooks/use-tools";
 
-function ToolCard({ tool, isFavorite, onToggleFavorite, index }: { 
+function ToolCard({ tool, isFavorite, onToggleFavorite, index, compact = false }: { 
   tool: Tool; 
   isFavorite: boolean; 
   onToggleFavorite: () => void;
   index: number;
+  compact?: boolean;
 }) {
   const tip = toolTips[tool.href];
   
@@ -31,29 +32,29 @@ function ToolCard({ tool, isFavorite, onToggleFavorite, index }: {
           e.stopPropagation();
           onToggleFavorite();
         }}
-        className={`absolute top-3 right-3 z-10 p-1.5 rounded-full transition-all duration-200 ${
+        className={`absolute top-2 sm:top-3 right-2 sm:right-3 z-10 p-1 sm:p-1.5 rounded-full transition-all duration-200 ${
           isFavorite 
             ? "bg-yellow-500/20 text-yellow-400" 
             : "bg-muted/50 text-muted-foreground opacity-0 group-hover/card:opacity-100"
         }`}
         data-testid={`button-favorite-${tool.href.replace(/\//g, '-').slice(1)}`}
       >
-        <Star className={`h-4 w-4 ${isFavorite ? "fill-current" : ""}`} />
+        <Star className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${isFavorite ? "fill-current" : ""}`} />
       </button>
       <Tooltip>
         <TooltipTrigger asChild>
           <Link href={tool.href || "#"} data-testid={`tool-card-${tool.href?.replace(/\//g, '-').slice(1)}`}>
-            <Card className="group relative h-full overflow-hidden p-4 sm:p-6 transition-all duration-300 hover:shadow-xl hover:shadow-cyan-500/10 cursor-pointer border-border/50 hover:border-cyan-500/30 flex flex-col bg-card">
+            <Card className="group relative h-full overflow-hidden p-3 sm:p-6 transition-all duration-300 hover:shadow-xl hover:shadow-cyan-500/10 cursor-pointer border-border/50 hover:border-cyan-500/30 flex flex-col bg-card">
               <motion.div 
-                className={`mb-3 sm:mb-4 inline-flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl ${tool.color} transition-all duration-300`}
+                className={`mb-2 sm:mb-4 inline-flex h-8 w-8 sm:h-12 sm:w-12 items-center justify-center rounded-lg sm:rounded-xl ${tool.color} transition-all duration-300`}
                 whileHover={{ scale: 1.1, rotate: 5 }}
               >
-                <tool.icon className="h-5 w-5 sm:h-6 sm:w-6" />
+                <tool.icon className="h-4 w-4 sm:h-6 sm:w-6" />
               </motion.div>
-              <h3 className="mb-1 sm:mb-2 text-lg sm:text-xl font-bold font-display tracking-tight group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors">
+              <h3 className="mb-0.5 sm:mb-2 text-sm sm:text-xl font-bold font-display tracking-tight group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors leading-tight">
                 {tool.title}
               </h3>
-              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed flex-1">
+              <p className="text-[11px] sm:text-sm text-muted-foreground leading-snug sm:leading-relaxed flex-1 hidden sm:block">
                 {tool.description}
               </p>
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-500 to-blue-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
@@ -194,12 +195,12 @@ export function ToolGrid() {
             )}
           </div>
           
-          <div className="flex flex-wrap justify-center gap-2 mt-6">
+          <div className="flex flex-nowrap sm:flex-wrap justify-start sm:justify-center gap-2 mt-6 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
             {categoryFilters.map((filter) => (
               <button
                 key={filter.id}
                 onClick={() => setSelectedCategory(filter.id)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${
                   selectedCategory === filter.id
                     ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/25"
                     : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/50"
@@ -227,7 +228,7 @@ export function ToolGrid() {
                     Favorites
                   </h3>
                 </div>
-                <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {favoriteTools.map((tool, index) => (
                     <ToolCard
                       key={`fav-${tool.href}`}
@@ -281,7 +282,7 @@ export function ToolGrid() {
                       exit={{ opacity: 0, height: 0 }}
                       transition={{ duration: 0.3 }}
                     >
-                      <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      <div className="grid grid-cols-2 gap-2.5 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         {category.tools.map((tool, index) => (
                           <ToolCard
                             key={tool.href}

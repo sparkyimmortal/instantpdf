@@ -27,7 +27,7 @@ RUN pip3 install --break-system-packages \
 
 RUN ln -sf /usr/bin/chromium /usr/bin/chromium-browser || true
 
-RUN go install github.com/pdfcpu/pdfcpu/cmd/pdfcpu@latest && \
+RUN go install github.com/pdfcpu/pdfcpu/cmd/pdfcpu@v0.8.1 && \
     cp /root/go/bin/pdfcpu /usr/local/bin/pdfcpu
 
 WORKDIR /app

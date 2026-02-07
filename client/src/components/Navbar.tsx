@@ -131,72 +131,68 @@ export function Navbar() {
       )}
 
       {isOpen && (
-        <div
-          className="fixed top-16 right-0 bottom-0 z-50 w-full max-w-sm bg-background border-l border-border/50 p-6 shadow-2xl md:hidden"
-        >
-          <nav className="flex flex-col space-y-2">
-            {navLinks.map((link) => (
-              <Link 
-                key={link.href}
-                href={link.href}
-                className={`flex items-center px-4 py-3 rounded-xl text-lg font-medium transition-colors hover:bg-muted ${
-                  location === link.href 
-                    ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20' 
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="mt-8 flex flex-col gap-3">
+        <div className="fixed top-16 left-0 right-0 z-50 bg-background border-b border-border/50 shadow-xl md:hidden max-h-[calc(100vh-4rem)] overflow-y-auto">
+          <div className="p-4">
+            <nav className="flex flex-col space-y-1">
+              {navLinks.map((link) => (
+                <Link 
+                  key={link.href}
+                  href={link.href}
+                  className={`flex items-center px-4 py-3 rounded-lg text-base font-medium transition-colors ${
+                    location === link.href 
+                      ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400' 
+                      : 'text-foreground hover:bg-muted'
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
+            <div className="border-t border-border/50 mt-3 pt-3 flex flex-col gap-2">
               {user ? (
                 <>
-                  <div className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground">
                     <User className="h-4 w-4" />
                     <span className="truncate">{user.email}</span>
                   </div>
                   <Link href="/profile">
-                    <Button variant="outline" size="lg" className="w-full mb-2">
-                      <Settings className="h-4 w-4 mr-2" />
+                    <Button variant="ghost" className="w-full justify-start gap-2">
+                      <Settings className="h-4 w-4" />
                       Profile Settings
                     </Button>
                   </Link>
                   {user.role === "admin" && (
                     <Link href="/admin">
-                      <Button variant="outline" size="lg" className="w-full mb-2">
-                        <Shield className="h-4 w-4 mr-2" />
+                      <Button variant="ghost" className="w-full justify-start gap-2">
+                        <Shield className="h-4 w-4" />
                         Admin Dashboard
                       </Button>
                     </Link>
                   )}
                   <Button 
-                    variant="outline" 
-                    size="lg" 
-                    className="w-full"
+                    variant="ghost" 
+                    className="w-full justify-start gap-2 text-red-500 hover:text-red-600 hover:bg-red-500/10"
                     onClick={() => { logout(); setLocation("/"); }}
                   >
-                    <LogOut className="h-4 w-4 mr-2" />
+                    <LogOut className="h-4 w-4" />
                     Sign out
                   </Button>
                 </>
               ) : (
-                <>
-                  <Link href="/login">
-                    <Button variant="outline" size="lg" className="w-full">
+                <div className="flex gap-2">
+                  <Link href="/login" className="flex-1">
+                    <Button variant="outline" className="w-full">
                       Log in
                     </Button>
                   </Link>
-                  <Link href="/signup">
-                    <Button 
-                      size="lg" 
-                      className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 border-0 shadow-lg shadow-cyan-500/20"
-                    >
+                  <Link href="/signup" className="flex-1">
+                    <Button className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 border-0">
                       Sign up
                     </Button>
                   </Link>
-                </>
+                </div>
               )}
+            </div>
           </div>
         </div>
       )}

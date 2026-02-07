@@ -28,3 +28,4 @@ pdf-backend/work/
 .cache/
 .local/
 .upm/
+go*.tar.gz

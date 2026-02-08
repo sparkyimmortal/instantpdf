@@ -8,7 +8,7 @@ import { UsageStatsDashboard } from "@/components/UsageStatsDashboard";
 
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { motion } from "framer-motion";
-import { Zap, Shield, Clock, FileText, Users, Globe, ArrowRight, Mail, Heart } from "lucide-react";
+import { Zap, Shield, Clock, FileText, Users, Globe, ArrowRight, Mail, Heart, Smartphone, Download, Camera, QrCode, Wifi } from "lucide-react";
 import { Link } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -130,6 +130,82 @@ export default function Home() {
                   </Card>
                 </motion.div>
               ))}
+            </div>
+          </div>
+        </motion.section>
+
+        <motion.section
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          className="py-16 sm:py-20"
+        >
+          <div className="container px-4 md:px-6">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-display font-bold mb-4" data-testid="text-mobile-app-title">
+                Get the Mobile App
+              </h2>
+              <p className="text-muted-foreground max-w-lg mx-auto">
+                Take InstantPDF with you. All tools in your pocket, plus exclusive mobile features.
+              </p>
+            </div>
+            <div className="grid md:grid-cols-2 gap-8 items-center max-w-4xl mx-auto">
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {[
+                    { icon: FileText, title: "50+ PDF Tools", desc: "All tools available on mobile" },
+                    { icon: Camera, title: "Document Scanner", desc: "Scan with your camera" },
+                    { icon: QrCode, title: "QR Code Generator", desc: "Create QR codes instantly" },
+                    { icon: Wifi, title: "Offline Mode", desc: "Queue tasks for later" },
+                  ].map((feature, i) => (
+                    <motion.div
+                      key={feature.title}
+                      initial={{ opacity: 0, x: -20 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: i * 0.1 }}
+                      className="flex items-start gap-3"
+                    >
+                      <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-cyan-500/10 to-blue-500/10 flex items-center justify-center flex-shrink-0">
+                        <feature.icon className="h-5 w-5 text-cyan-500" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-sm">{feature.title}</h4>
+                        <p className="text-xs text-muted-foreground">{feature.desc}</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.2 }}
+              >
+                <Card className="p-8 text-center bg-gradient-to-br from-cyan-500/5 to-blue-600/5 border-cyan-500/20">
+                  <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 mb-4">
+                    <Smartphone className="h-8 w-8 text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-2">InstantPDF for Android</h3>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Download the APK and install directly on your Android device.
+                  </p>
+                  <a href="/InstantPDF.apk" download>
+                    <Button
+                      size="lg"
+                      className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-lg shadow-cyan-500/25"
+                      data-testid="button-download-apk"
+                    >
+                      <Download className="h-5 w-5 mr-2" />
+                      Download APK
+                    </Button>
+                  </a>
+                  <p className="text-xs text-muted-foreground mt-3">
+                    Android 8.0+ required
+                  </p>
+                </Card>
+              </motion.div>
             </div>
           </div>
         </motion.section>

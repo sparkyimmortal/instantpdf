@@ -17,7 +17,8 @@ export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (window.scrollY === 0) {
+    const scrollTop = window.scrollY || document.documentElement.scrollTop;
+    if (scrollTop <= 0) {
       startY.current = e.touches[0].clientY;
       setPulling(true);
     }
@@ -27,7 +28,11 @@ export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
     (e: React.TouchEvent) => {
       if (!pulling || refreshing) return;
       const currentY = e.touches[0].clientY;
-      const diff = Math.max(0, currentY - startY.current);
+      const diff = currentY - startY.current;
+      if (diff <= 0) {
+        setPullDistance(0);
+        return;
+      }
       const dampened = Math.min(diff * 0.5, 120);
       setPullDistance(dampened);
     },

@@ -88,6 +88,16 @@ const pageTransition = {
   ease: [0.4, 0, 0.2, 1] as const,
 };
 
+function ScrollToTop() {
+  const [location] = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location]);
+
+  return null;
+}
+
 function ToolUsageTracker() {
   const [location] = useLocation();
   const { recordUsage } = useRecentTools();
@@ -214,6 +224,7 @@ function App() {
             {!splashDone && <SplashScreen onComplete={() => setSplashDone(true)} />}
             <OfflineBanner />
             <Toaster />
+            <ScrollToTop />
             <ToolUsageTracker />
             <Router />
             <BottomNav />

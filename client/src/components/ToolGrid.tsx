@@ -1,23 +1,31 @@
 import { useState, useEffect, useMemo } from "react";
-import { Search, Star, ChevronRight } from "lucide-react";
+import { Search, Star, ChevronRight, Lock, Crown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
-import { toolCategories, toolTips, useFavorites, type Tool } from "@/hooks/use-tools";
+import { toolCategories, toolTips, useFavorites, canAccessTool, getToolAccessLabel, type Tool, type PlanLevel } from "@/hooks/use-tools";
+import { hapticFeedback } from "@/hooks/use-haptic";
+import { useLazyLoad } from "@/hooks/use-lazy-load";
+import { useAuth } from "@/contexts/AuthContext";
 
-function ToolCard({ tool, isFavorite, onToggleFavorite, index, compact = false }: { 
+function ToolCard({ tool, isFavorite, onToggleFavorite, index, userPlan, compact = false }: { 
   tool: Tool; 
   isFavorite: boolean; 
   onToggleFavorite: () => void;
   index: number;
+  userPlan: PlanLevel;
   compact?: boolean;
 }) {
   const tip = toolTips[tool.href];
+  const { ref, isVisible } = useLazyLoad();
+  const hasAccess = canAccessTool(tool, userPlan);
+  const accessLabel = getToolAccessLabel(tool);
   
   return (
     <motion.div
+      ref={ref}
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
@@ -30,6 +38,7 @@ function ToolCard({ tool, isFavorite, onToggleFavorite, index, compact = false }
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
+          hapticFeedback("light");
           onToggleFavorite();
         }}
         className={`absolute top-2 sm:top-3 right-2 sm:right-3 z-10 p-1 sm:p-1.5 rounded-full transition-all duration-200 ${
@@ -41,23 +50,41 @@ function ToolCard({ tool, isFavorite, onToggleFavorite, index, compact = false }
       >
         <Star className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${isFavorite ? "fill-current" : ""}`} />
       </button>
+      {accessLabel && !hasAccess && (
+        <div className={`absolute top-2 sm:top-3 left-2 sm:left-3 z-10 flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold ${
+          accessLabel === "Pro" 
+            ? "bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-500 border border-amber-500/30" 
+            : "bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-500 border border-cyan-500/30"
+        }`}>
+          {accessLabel === "Pro" ? <Crown className="h-2.5 w-2.5 sm:h-3 sm:w-3" /> : <Lock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />}
+          {accessLabel}
+        </div>
+      )}
       <Tooltip>
         <TooltipTrigger asChild>
           <Link href={tool.href || "#"} data-testid={`tool-card-${tool.href?.replace(/\//g, '-').slice(1)}`}>
-            <Card className="group relative h-full overflow-hidden p-3 sm:p-6 transition-all duration-300 hover:shadow-xl hover:shadow-cyan-500/10 cursor-pointer border-border/50 hover:border-cyan-500/30 flex flex-col bg-card">
+            <Card className={`group relative h-full overflow-hidden p-3 sm:p-6 transition-all duration-300 cursor-pointer border-border/50 flex flex-col bg-card ${
+              hasAccess 
+                ? "hover:shadow-xl hover:shadow-cyan-500/10 hover:border-cyan-500/30" 
+                : "opacity-75 hover:opacity-100 hover:shadow-lg hover:border-amber-500/30"
+            }`}>
               <motion.div 
-                className={`mb-2 sm:mb-4 inline-flex h-8 w-8 sm:h-12 sm:w-12 items-center justify-center rounded-lg sm:rounded-xl ${tool.color} transition-all duration-300`}
+                className={`mb-2 sm:mb-4 inline-flex h-8 w-8 sm:h-12 sm:w-12 items-center justify-center rounded-lg sm:rounded-xl ${tool.color} transition-all duration-300 ${!hasAccess ? "grayscale-[30%]" : ""}`}
                 whileHover={{ scale: 1.1, rotate: 5 }}
               >
-                <tool.icon className="h-4 w-4 sm:h-6 sm:w-6" />
+                {isVisible && <tool.icon className="h-4 w-4 sm:h-6 sm:w-6" />}
               </motion.div>
-              <h3 className="mb-0.5 sm:mb-2 text-sm sm:text-xl font-bold font-display tracking-tight group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors leading-tight">
+              <h3 className={`mb-0.5 sm:mb-2 text-sm sm:text-xl font-bold font-display tracking-tight transition-colors leading-tight ${
+                hasAccess ? "group-hover:text-cyan-600 dark:group-hover:text-cyan-400" : "group-hover:text-amber-600 dark:group-hover:text-amber-400"
+              }`}>
                 {tool.title}
               </h3>
               <p className="text-[11px] sm:text-sm text-muted-foreground leading-snug sm:leading-relaxed flex-1 hidden sm:block">
                 {tool.description}
               </p>
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-500 to-blue-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
+              <div className={`absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r ${
+                hasAccess ? "from-cyan-500 to-blue-500" : "from-amber-500 to-orange-500"
+              } transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left`} />
             </Card>
           </Link>
         </TooltipTrigger>
@@ -95,6 +122,8 @@ export function ToolGrid() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [collapsedCategories, setCollapsedCategories] = useState<string[]>([]);
   const { favorites, toggleFavorite, isFavorite } = useFavorites();
+  const { user } = useAuth();
+  const userPlan: PlanLevel = user?.plan === "pro" ? "pro" : user ? "free" : "anonymous";
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -236,6 +265,7 @@ export function ToolGrid() {
                       isFavorite={true}
                       onToggleFavorite={() => toggleFavorite(tool.href)}
                       index={index}
+                      userPlan={userPlan}
                     />
                   ))}
                 </div>
@@ -290,6 +320,7 @@ export function ToolGrid() {
                             isFavorite={isFavorite(tool.href)}
                             onToggleFavorite={() => toggleFavorite(tool.href)}
                             index={index}
+                            userPlan={userPlan}
                           />
                         ))}
                       </div>

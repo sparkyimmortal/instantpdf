@@ -12,7 +12,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/hooks/use-theme";
 import { 
   Mail, Calendar, Shield, Lock, Check, AlertCircle, Clock, History, Trash2, 
-  Sun, Moon, Monitor, Zap, TrendingUp, Award, FileText, Sparkles, Crown
+  Sun, Moon, Monitor, Zap, TrendingUp, Award, FileText, Sparkles, Crown,
+  ChevronRight, LogOut, Eye, EyeOff
 } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -69,6 +70,8 @@ export default function Profile() {
   const [deleteError, setDeleteError] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [usageLimits, setUsageLimits] = useState<UsageLimits | null>(null);
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -149,7 +152,7 @@ export default function Profile() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-cyan-950/20">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500"></div>
       </div>
     );
@@ -262,82 +265,113 @@ export default function Profile() {
   const usagePercent = usageLimits ? Math.min((usageLimits.used / usageLimits.limit) * 100, 100) : 0;
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-background to-cyan-950/10">
+    <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
-      <main className="flex-1 container py-8 px-4 md:px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="max-w-5xl mx-auto"
-        >
-          <div className="text-center mb-10 relative">
+
+      <div className="relative overflow-hidden border-b border-border/40">
+        <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/8 via-blue-500/5 to-purple-500/8 dark:from-cyan-500/15 dark:via-blue-500/10 dark:to-purple-500/15" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-cyan-400/10 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
+        <div className="absolute bottom-0 left-0 w-72 h-72 bg-gradient-to-tr from-purple-400/10 to-transparent rounded-full blur-3xl translate-y-1/3 -translate-x-1/4" />
+
+        <div className="relative container px-4 md:px-6 py-10 md:py-14">
+          <div className="max-w-5xl mx-auto">
             <motion.div
-              className="relative inline-block mb-6"
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 200, damping: 15 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="flex flex-col md:flex-row items-center md:items-start gap-6"
             >
-              <div className="w-28 h-28 rounded-full bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600 p-1 shadow-2xl shadow-cyan-500/30">
-                <div className="w-full h-full rounded-full bg-background/90 backdrop-blur-sm flex items-center justify-center relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-purple-500/10"></div>
-                  <span className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent relative z-10">
-                    {getInitials(user.email)}
-                  </span>
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                className="relative"
+              >
+                <div className="w-24 h-24 md:w-28 md:h-28 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600 p-[3px] shadow-xl shadow-cyan-500/20">
+                  <div className="w-full h-full rounded-[13px] bg-background flex items-center justify-center">
+                    <span className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-cyan-500 to-blue-600 dark:from-cyan-400 dark:to-blue-500 bg-clip-text text-transparent">
+                      {getInitials(user.email)}
+                    </span>
+                  </div>
+                </div>
+                {user.plan === "pro" && (
+                  <motion.div
+                    className="absolute -top-2 -right-2 bg-gradient-to-r from-amber-400 to-orange-500 rounded-xl p-1.5 shadow-lg shadow-amber-500/30"
+                    animate={{ rotate: [0, 8, -8, 0] }}
+                    transition={{ repeat: Infinity, duration: 3 }}
+                  >
+                    <Crown className="h-4 w-4 text-white" />
+                  </motion.div>
+                )}
+              </motion.div>
+
+              <div className="flex-1 text-center md:text-left">
+                <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-1">
+                  {user.email.split('@')[0]}
+                </h1>
+                <p className="text-muted-foreground mb-3">{user.email}</p>
+                <div className="flex flex-wrap items-center gap-2 justify-center md:justify-start">
+                  <Badge 
+                    className={`px-3 py-1 text-xs font-semibold ${user.plan === "pro" 
+                      ? "bg-gradient-to-r from-amber-500/15 to-orange-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30" 
+                      : "bg-gradient-to-r from-cyan-500/15 to-blue-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/30"}`}
+                  >
+                    {user.plan === "pro" ? <Crown className="h-3 w-3 mr-1.5" /> : <Sparkles className="h-3 w-3 mr-1.5" />}
+                    {user.plan.toUpperCase()} PLAN
+                  </Badge>
+                  {planValidity && (
+                    <Badge variant="outline" className={planValidity.color}>
+                      <Clock className="h-3 w-3 mr-1" />
+                      {planValidity.text}
+                    </Badge>
+                  )}
                 </div>
               </div>
-              {user.plan === "pro" && (
-                <motion.div
-                  className="absolute -top-1 -right-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full p-2 shadow-lg"
-                  animate={{ rotate: [0, 10, -10, 0] }}
-                  transition={{ repeat: Infinity, duration: 2 }}
-                >
-                  <Crown className="h-4 w-4 text-white" />
-                </motion.div>
-              )}
-            </motion.div>
-            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent">
-              Welcome back!
-            </h1>
-            <p className="text-muted-foreground mt-2 text-lg">{user.email}</p>
-            <div className="flex items-center justify-center gap-2 mt-3">
-              <Badge 
-                className={`px-3 py-1 ${user.plan === "pro" 
-                  ? "bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-500 border-amber-500/30" 
-                  : "bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-500 border-cyan-500/30"}`}
-              >
-                {user.plan === "pro" ? <Crown className="h-3 w-3 mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
-                {user.plan.toUpperCase()} PLAN
-              </Badge>
-              {planValidity && (
-                <Badge variant="outline" className={planValidity.color}>
-                  <Clock className="h-3 w-3 mr-1" />
-                  {planValidity.text}
-                </Badge>
-              )}
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+              <div className="flex gap-2 mt-2 md:mt-0">
+                {user.plan === "free" && (
+                  <Button 
+                    size="sm" 
+                    className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-lg shadow-amber-500/20 text-white border-0"
+                    data-testid="button-upgrade-pro"
+                  >
+                    <Crown className="h-4 w-4 mr-1.5" />
+                    Upgrade to Pro
+                  </Button>
+                )}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={logout}
+                  className="border-border/60"
+                  data-testid="button-logout"
+                >
+                  <LogOut className="h-4 w-4 mr-1.5" />
+                  Sign out
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </div>
+
+      <main className="flex-1 container py-8 px-4 md:px-6">
+        <div className="max-w-5xl mx-auto">
+          <div className="grid grid-cols-3 gap-3 md:gap-4 mb-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
-              <Card className="relative overflow-hidden border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 to-transparent hover:shadow-lg hover:shadow-cyan-500/10 transition-all duration-300">
-                <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-cyan-500/20 to-transparent rounded-bl-full"></div>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20">
-                      <FileText className="h-6 w-6 text-cyan-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Operations</p>
-                      <p className="text-3xl font-bold text-cyan-500" data-testid="text-total-operations">
-                        <AnimatedCounter value={stats.total} />
-                      </p>
-                    </div>
+              <Card className="relative overflow-hidden border-cyan-500/20 bg-gradient-to-br from-cyan-50/80 to-white dark:from-cyan-500/5 dark:to-transparent hover:shadow-md transition-all">
+                <CardContent className="pt-5 pb-4 px-4">
+                  <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-cyan-100 to-cyan-200/60 dark:from-cyan-500/20 dark:to-cyan-500/10 flex items-center justify-center mb-3">
+                    <FileText className="h-4 w-4 text-cyan-600 dark:text-cyan-500" />
                   </div>
+                  <p className="text-2xl md:text-3xl font-bold text-cyan-600 dark:text-cyan-500" data-testid="text-total-operations">
+                    <AnimatedCounter value={stats.total} />
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Operations</p>
                 </CardContent>
               </Card>
             </motion.div>
@@ -347,20 +381,15 @@ export default function Profile() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <Card className="relative overflow-hidden border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-transparent hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300">
-                <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-purple-500/20 to-transparent rounded-bl-full"></div>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20">
-                      <TrendingUp className="h-6 w-6 text-purple-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Favorite Tool</p>
-                      <p className="text-lg font-bold text-purple-500 capitalize truncate" data-testid="text-favorite-tool">
-                        {stats.favorite?.replace(/-/g, " ") || "None yet"}
-                      </p>
-                    </div>
+              <Card className="relative overflow-hidden border-purple-500/20 bg-gradient-to-br from-purple-50/80 to-white dark:from-purple-500/5 dark:to-transparent hover:shadow-md transition-all">
+                <CardContent className="pt-5 pb-4 px-4">
+                  <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-purple-100 to-purple-200/60 dark:from-purple-500/20 dark:to-purple-500/10 flex items-center justify-center mb-3">
+                    <TrendingUp className="h-4 w-4 text-purple-600 dark:text-purple-500" />
                   </div>
+                  <p className="text-sm md:text-base font-bold text-purple-600 dark:text-purple-500 capitalize truncate" data-testid="text-favorite-tool">
+                    {stats.favorite?.replace(/-/g, " ") || "None yet"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Favorite Tool</p>
                 </CardContent>
               </Card>
             </motion.div>
@@ -370,20 +399,15 @@ export default function Profile() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
-              <Card className="relative overflow-hidden border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-transparent hover:shadow-lg hover:shadow-amber-500/10 transition-all duration-300">
-                <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-amber-500/20 to-transparent rounded-bl-full"></div>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20">
-                      <Award className="h-6 w-6 text-amber-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Activity Streak</p>
-                      <p className="text-3xl font-bold text-amber-500" data-testid="text-activity-streak">
-                        <AnimatedCounter value={stats.streak} /> <span className="text-lg">days</span>
-                      </p>
-                    </div>
+              <Card className="relative overflow-hidden border-amber-500/20 bg-gradient-to-br from-amber-50/80 to-white dark:from-amber-500/5 dark:to-transparent hover:shadow-md transition-all">
+                <CardContent className="pt-5 pb-4 px-4">
+                  <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-amber-100 to-amber-200/60 dark:from-amber-500/20 dark:to-amber-500/10 flex items-center justify-center mb-3">
+                    <Award className="h-4 w-4 text-amber-600 dark:text-amber-500" />
                   </div>
+                  <p className="text-2xl md:text-3xl font-bold text-amber-600 dark:text-amber-500" data-testid="text-activity-streak">
+                    <AnimatedCounter value={stats.streak} /><span className="text-base"> days</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Streak</p>
                 </CardContent>
               </Card>
             </motion.div>
@@ -396,39 +420,28 @@ export default function Profile() {
               transition={{ delay: 0.4 }}
               className="mb-8"
             >
-              <Card className="border-cyan-500/20 bg-gradient-to-r from-cyan-500/5 via-transparent to-blue-500/5">
-                <CardContent className="pt-6">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-500/20">
-                        <Zap className="h-5 w-5 text-cyan-500" />
+              <Card className="border-border/50 bg-gradient-to-r from-cyan-50/50 via-white to-blue-50/50 dark:from-cyan-500/5 dark:via-transparent dark:to-blue-500/5">
+                <CardContent className="pt-5 pb-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-cyan-100 to-blue-100 dark:from-cyan-500/20 dark:to-blue-500/20 flex items-center justify-center">
+                        <Zap className="h-4 w-4 text-cyan-600 dark:text-cyan-500" />
                       </div>
                       <div>
-                        <h3 className="font-semibold">Daily Usage</h3>
-                        <p className="text-sm text-muted-foreground" data-testid="text-usage-info">
-                          {usageLimits.used} of {usageLimits.limit} operations used today
+                        <h3 className="text-sm font-semibold">Daily Usage</h3>
+                        <p className="text-xs text-muted-foreground" data-testid="text-usage-info">
+                          {usageLimits.used} of {usageLimits.limit} operations
                         </p>
                       </div>
                     </div>
-                    {user.plan === "free" && (
-                      <Button 
-                        size="sm" 
-                        className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
-                        data-testid="button-upgrade-pro"
-                      >
-                        <Crown className="h-4 w-4 mr-2" />
-                        Upgrade to Pro
-                      </Button>
-                    )}
+                    <span className="text-sm font-bold text-cyan-600 dark:text-cyan-500">
+                      {usageLimits.limit - usageLimits.used} left
+                    </span>
                   </div>
                   <Progress 
                     value={usagePercent} 
-                    className="h-3 bg-muted"
+                    className="h-2.5 bg-muted/50"
                   />
-                  <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                    <span>{usagePercent.toFixed(0)}% used</span>
-                    <span>{usageLimits.limit - usageLimits.used} remaining</span>
-                  </div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -437,105 +450,85 @@ export default function Profile() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="space-y-6">
               <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5 }}
               >
-                <Card className="border-muted/50 backdrop-blur-sm bg-card/50 hover:bg-card/80 transition-colors">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-500/20">
-                        <History className="h-5 w-5 text-cyan-500" />
+                <Card className="border-border/50">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2.5">
+                      <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-500/20 dark:to-cyan-500/20 flex items-center justify-center">
+                        <Mail className="h-4 w-4 text-blue-600 dark:text-blue-500" />
                       </div>
-                      Recent Activity
+                      Account Information
                     </CardTitle>
-                    <CardDescription>Your latest PDF operations</CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    {loadingOps ? (
-                      <div className="flex justify-center py-8">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-500"></div>
+                  <CardContent className="space-y-1">
+                    {[
+                      { icon: Mail, label: "Email", value: user.email, testId: "text-user-email" },
+                      { icon: Shield, label: "Plan", value: user.plan.charAt(0).toUpperCase() + user.plan.slice(1), testId: "text-user-plan", badge: user.plan === "pro" },
+                      { icon: Calendar, label: "Member since", value: formatDate(user.createdAt), testId: "text-user-created" },
+                    ].map((item) => (
+                      <div key={item.label} className="flex items-center justify-between py-3 border-b border-border/30 last:border-0">
+                        <div className="flex items-center gap-3">
+                          <item.icon className="h-4 w-4 text-muted-foreground/60" />
+                          <span className="text-sm text-muted-foreground">{item.label}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium truncate max-w-[200px]" data-testid={item.testId}>{item.value}</span>
+                          {item.badge && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-600 dark:text-amber-400 font-bold">
+                              PRO
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    ) : operations.length === 0 ? (
-                      <div className="text-center py-8">
-                        <FileText className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
-                        <p className="text-muted-foreground">No recent activity</p>
-                        <p className="text-sm text-muted-foreground/60">Start using PDF tools to see your history</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
-                        {operations.slice(0, 10).map((op, index) => (
-                          <motion.div 
-                            key={op.id} 
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: index * 0.05 }}
-                            className="flex items-center justify-between p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors group"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="w-2 h-2 rounded-full bg-cyan-500 group-hover:scale-125 transition-transform"></div>
-                              <div>
-                                <p className="font-medium capitalize">{op.operation.replace(/-/g, " ")}</p>
-                                <p className="text-xs text-muted-foreground">{formatDateTime(op.createdAt)}</p>
-                              </div>
-                            </div>
-                            <Badge 
-                              variant={op.status === "success" ? "default" : "destructive"}
-                              className={op.status === "success" ? "bg-green-500/20 text-green-500 border-green-500/30" : ""}
-                            >
-                              {op.status === "success" ? <Check className="h-3 w-3 mr-1" /> : null}
-                              {op.status}
-                            </Badge>
-                          </motion.div>
-                        ))}
-                      </div>
-                    )}
+                    ))}
                   </CardContent>
                 </Card>
               </motion.div>
 
               <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.6 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.55 }}
               >
-                <Card className="border-muted/50 backdrop-blur-sm bg-card/50 hover:bg-card/80 transition-colors">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20">
-                        {theme === "dark" ? <Moon className="h-5 w-5 text-purple-500" /> : <Sun className="h-5 w-5 text-amber-500" />}
+                <Card className="border-border/50">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2.5">
+                      <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-500/20 dark:to-pink-500/20 flex items-center justify-center">
+                        {theme === "dark" ? <Moon className="h-4 w-4 text-purple-600 dark:text-purple-500" /> : <Sun className="h-4 w-4 text-amber-600 dark:text-amber-500" />}
                       </div>
-                      Theme Preference
+                      Appearance
                     </CardTitle>
-                    <CardDescription>Customize your visual experience</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-3 gap-2.5">
                       {[
-                        { value: "light", icon: Sun, label: "Light", color: "amber" },
-                        { value: "dark", icon: Moon, label: "Dark", color: "purple" },
-                        { value: "system", icon: Monitor, label: "System", color: "cyan" }
-                      ].map(({ value, icon: Icon, label, color }) => (
+                        { value: "light", icon: Sun, label: "Light" },
+                        { value: "dark", icon: Moon, label: "Dark" },
+                        { value: "system", icon: Monitor, label: "System" }
+                      ].map(({ value, icon: Icon, label }) => (
                         <button
                           key={value}
                           onClick={() => setTheme(value as any)}
-                          className={`relative p-4 rounded-xl border-2 transition-all duration-300 ${
+                          className={`relative p-3.5 rounded-xl border-2 transition-all duration-200 ${
                             theme === value 
-                              ? `border-${color}-500 bg-${color}-500/10 shadow-lg shadow-${color}-500/20` 
-                              : "border-muted hover:border-muted-foreground/30 hover:bg-muted/30"
+                              ? "border-cyan-500 bg-cyan-500/10 dark:bg-cyan-500/10 shadow-sm" 
+                              : "border-border/50 hover:border-border hover:bg-muted/30"
                           }`}
                           data-testid={`button-theme-${value}`}
                         >
-                          <Icon className={`h-6 w-6 mx-auto mb-2 ${theme === value ? `text-${color}-500` : "text-muted-foreground"}`} />
-                          <p className={`text-sm font-medium ${theme === value ? `text-${color}-500` : "text-muted-foreground"}`}>
+                          <Icon className={`h-5 w-5 mx-auto mb-1.5 ${theme === value ? "text-cyan-600 dark:text-cyan-400" : "text-muted-foreground"}`} />
+                          <p className={`text-xs font-medium ${theme === value ? "text-cyan-600 dark:text-cyan-400" : "text-muted-foreground"}`}>
                             {label}
                           </p>
                           {theme === value && (
                             <motion.div 
                               layoutId="themeIndicator"
-                              className={`absolute -top-1 -right-1 w-4 h-4 rounded-full bg-${color}-500 flex items-center justify-center`}
+                              className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-cyan-500 flex items-center justify-center"
                             >
-                              <Check className="h-3 w-3 text-white" />
+                              <Check className="h-2.5 w-2.5 text-white" />
                             </motion.div>
                           )}
                         </button>
@@ -546,49 +539,59 @@ export default function Profile() {
               </motion.div>
 
               <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.7 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6 }}
               >
-                <Card className="border-muted/50 backdrop-blur-sm bg-card/50 hover:bg-card/80 transition-colors">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/20">
-                        <Mail className="h-5 w-5 text-blue-500" />
-                      </div>
-                      Account Details
-                    </CardTitle>
-                    <CardDescription>Your account information</CardDescription>
+                <Card className="border-border/50">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base flex items-center gap-2.5">
+                        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-cyan-100 to-blue-100 dark:from-cyan-500/20 dark:to-blue-500/20 flex items-center justify-center">
+                          <History className="h-4 w-4 text-cyan-600 dark:text-cyan-500" />
+                        </div>
+                        Recent Activity
+                      </CardTitle>
+                      {operations.length > 0 && (
+                        <Badge variant="outline" className="text-xs">{operations.length} total</Badge>
+                      )}
+                    </div>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30">
-                      <Mail className="h-5 w-5 text-muted-foreground" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-muted-foreground">Email Address</p>
-                        <p className="font-medium truncate" data-testid="text-user-email">{user.email}</p>
+                  <CardContent>
+                    {loadingOps ? (
+                      <div className="flex justify-center py-8">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-500"></div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30">
-                      <Shield className="h-5 w-5 text-muted-foreground" />
-                      <div className="flex-1">
-                        <p className="text-xs text-muted-foreground">Current Plan</p>
-                        <p className="font-medium capitalize flex items-center gap-2" data-testid="text-user-plan">
-                          {user.plan}
-                          {user.plan === "pro" && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-500">
-                              PRO
-                            </span>
-                          )}
-                        </p>
+                    ) : operations.length === 0 ? (
+                      <div className="text-center py-8">
+                        <div className="h-12 w-12 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-3">
+                          <FileText className="h-6 w-6 text-muted-foreground/40" />
+                        </div>
+                        <p className="text-sm font-medium text-muted-foreground">No activity yet</p>
+                        <p className="text-xs text-muted-foreground/60 mt-1">Use any PDF tool to see your history here</p>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30">
-                      <Calendar className="h-5 w-5 text-muted-foreground" />
-                      <div className="flex-1">
-                        <p className="text-xs text-muted-foreground">Member Since</p>
-                        <p className="font-medium" data-testid="text-user-created">{formatDate(user.createdAt)}</p>
+                    ) : (
+                      <div className="space-y-1.5 max-h-72 overflow-y-auto">
+                        {operations.slice(0, 10).map((op, index) => (
+                          <motion.div 
+                            key={op.id} 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: index * 0.03 }}
+                            className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-muted/40 transition-colors group"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-2 h-2 rounded-full ${op.status === "success" ? "bg-green-500" : "bg-red-400"}`} />
+                              <div>
+                                <p className="text-sm font-medium capitalize">{op.operation.replace(/-/g, " ")}</p>
+                                <p className="text-xs text-muted-foreground">{formatDateTime(op.createdAt)}</p>
+                              </div>
+                            </div>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors" />
+                          </motion.div>
+                        ))}
                       </div>
-                    </div>
+                    )}
                   </CardContent>
                 </Card>
               </motion.div>
@@ -596,72 +599,87 @@ export default function Profile() {
 
             <div className="space-y-6">
               <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5 }}
               >
-                <Card className="border-muted/50 backdrop-blur-sm bg-card/50 hover:bg-card/80 transition-colors">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <div className="p-2 rounded-lg bg-gradient-to-br from-green-500/20 to-emerald-500/20">
-                        <Lock className="h-5 w-5 text-green-500" />
+                <Card className="border-border/50">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2.5">
+                      <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-500/20 dark:to-emerald-500/20 flex items-center justify-center">
+                        <Lock className="h-4 w-4 text-green-600 dark:text-green-500" />
                       </div>
                       Change Password
                     </CardTitle>
-                    <CardDescription>Update your password to keep your account secure</CardDescription>
+                    <CardDescription className="text-xs">Keep your account secure with a strong password</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <form onSubmit={handleChangePassword} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="currentPassword">Current Password</Label>
-                        <Input
-                          id="currentPassword"
-                          type="password"
-                          value={currentPassword}
-                          onChange={(e) => setCurrentPassword(e.target.value)}
-                          placeholder="Enter your current password"
-                          required
-                          className="bg-muted/30 border-muted"
-                          data-testid="input-current-password"
-                        />
+                      <div className="space-y-1.5">
+                        <Label htmlFor="currentPassword" className="text-xs font-medium">Current password</Label>
+                        <div className="relative">
+                          <Input
+                            id="currentPassword"
+                            type={showCurrentPw ? "text" : "password"}
+                            value={currentPassword}
+                            onChange={(e) => setCurrentPassword(e.target.value)}
+                            placeholder="Enter current password"
+                            required
+                            className="h-11 rounded-xl bg-muted/30 border-border/60 pr-10"
+                            data-testid="input-current-password"
+                          />
+                          <button type="button" onClick={() => setShowCurrentPw(!showCurrentPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground">
+                            {showCurrentPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="newPassword">New Password</Label>
-                        <Input
-                          id="newPassword"
-                          type="password"
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="Enter your new password"
-                          required
-                          className="bg-muted/30 border-muted"
-                          data-testid="input-new-password"
-                        />
+                      <div className="space-y-1.5">
+                        <Label htmlFor="newPassword" className="text-xs font-medium">New password</Label>
+                        <div className="relative">
+                          <Input
+                            id="newPassword"
+                            type={showNewPw ? "text" : "password"}
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="Enter new password"
+                            required
+                            className="h-11 rounded-xl bg-muted/30 border-border/60 pr-10"
+                            data-testid="input-new-password"
+                          />
+                          <button type="button" onClick={() => setShowNewPw(!showNewPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground">
+                            {showNewPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                        <Input
-                          id="confirmPassword"
-                          type="password"
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          placeholder="Confirm your new password"
-                          required
-                          className="bg-muted/30 border-muted"
-                          data-testid="input-confirm-password"
-                        />
+                      <div className="space-y-1.5">
+                        <Label htmlFor="confirmPassword" className="text-xs font-medium">Confirm new password</Label>
+                        <div className="relative">
+                          <Input
+                            id="confirmPassword"
+                            type="password"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="Confirm new password"
+                            required
+                            className="h-11 rounded-xl bg-muted/30 border-border/60"
+                            data-testid="input-confirm-password"
+                          />
+                          {confirmPassword && newPassword === confirmPassword && (
+                            <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />
+                          )}
+                        </div>
                       </div>
 
                       {passwordError && (
-                        <div className="flex items-center gap-2 text-destructive text-sm p-3 rounded-lg bg-destructive/10" data-testid="text-password-error">
-                          <AlertCircle className="h-4 w-4" />
+                        <div className="flex items-center gap-2 text-destructive text-sm p-3 rounded-xl bg-destructive/10 border border-destructive/20" data-testid="text-password-error">
+                          <AlertCircle className="h-4 w-4 shrink-0" />
                           {passwordError}
                         </div>
                       )}
 
                       {passwordSuccess && (
-                        <div className="flex items-center gap-2 text-green-500 text-sm p-3 rounded-lg bg-green-500/10" data-testid="text-password-success">
-                          <Check className="h-4 w-4" />
+                        <div className="flex items-center gap-2 text-green-600 dark:text-green-500 text-sm p-3 rounded-xl bg-green-500/10 border border-green-500/20" data-testid="text-password-success">
+                          <Check className="h-4 w-4 shrink-0" />
                           {passwordSuccess}
                         </div>
                       )}
@@ -669,10 +687,15 @@ export default function Profile() {
                       <Button
                         type="submit"
                         disabled={isChangingPassword}
-                        className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 shadow-lg shadow-cyan-500/20"
+                        className="w-full h-11 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 shadow-md shadow-cyan-500/15 border-0"
                         data-testid="button-change-password"
                       >
-                        {isChangingPassword ? "Changing Password..." : "Change Password"}
+                        {isChangingPassword ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                            Updating...
+                          </>
+                        ) : "Update Password"}
                       </Button>
                     </form>
                   </CardContent>
@@ -680,81 +703,83 @@ export default function Profile() {
               </motion.div>
 
               <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6 }}
               >
-                <Card className="border-destructive/30 backdrop-blur-sm bg-destructive/5 hover:bg-destructive/10 transition-colors">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-destructive">
-                      <div className="p-2 rounded-lg bg-destructive/20">
-                        <Trash2 className="h-5 w-5" />
+                <Card className="border-red-200/60 dark:border-red-500/20">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2.5 text-red-600 dark:text-red-400">
+                      <div className="h-8 w-8 rounded-lg bg-red-100 dark:bg-red-500/15 flex items-center justify-center">
+                        <Trash2 className="h-4 w-4 text-red-500" />
                       </div>
                       Danger Zone
                     </CardTitle>
-                    <CardDescription>Irreversible account actions</CardDescription>
+                    <CardDescription className="text-xs">Permanent and irreversible actions</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-muted-foreground mb-4">
-                      Once you delete your account, there is no going back. All your data will be permanently removed.
+                      Deleting your account will permanently remove all your data and operation history. This cannot be undone.
                     </p>
                     <Button
-                      variant="destructive"
+                      variant="outline"
                       onClick={() => setDeleteDialog(true)}
-                      className="w-full"
+                      className="w-full border-red-300 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-700 dark:hover:text-red-300"
                       data-testid="button-delete-account"
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
-                      Delete My Account
+                      Delete Account
                     </Button>
                   </CardContent>
                 </Card>
               </motion.div>
             </div>
           </div>
-        </motion.div>
+        </div>
       </main>
 
       <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
-        <DialogContent>
+        <DialogContent className="rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-destructive flex items-center gap-2">
-              <Trash2 className="h-5 w-5" />
+            <DialogTitle className="text-red-600 dark:text-red-400 flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-red-100 dark:bg-red-500/15 flex items-center justify-center">
+                <Trash2 className="h-4 w-4 text-red-500" />
+              </div>
               Delete Account
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete your account? This action cannot be undone.
-              Please enter your password to confirm.
+              This action is permanent and cannot be undone. All your data will be permanently removed. Enter your password to confirm.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="deletePassword">Password</Label>
+              <Label htmlFor="deletePassword" className="text-sm font-medium">Password</Label>
               <Input
                 id="deletePassword"
                 type="password"
                 value={deletePassword}
                 onChange={(e) => setDeletePassword(e.target.value)}
                 placeholder="Enter your password to confirm"
-                className="bg-muted/30"
+                className="h-11 rounded-xl bg-muted/30 border-border/60"
                 data-testid="input-delete-password"
               />
             </div>
             {deleteError && (
-              <div className="flex items-center gap-2 text-destructive text-sm p-3 rounded-lg bg-destructive/10">
-                <AlertCircle className="h-4 w-4" />
+              <div className="flex items-center gap-2 text-destructive text-sm p-3 rounded-xl bg-destructive/10 border border-destructive/20">
+                <AlertCircle className="h-4 w-4 shrink-0" />
                 {deleteError}
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialog(false)}>
+            <Button variant="outline" onClick={() => setDeleteDialog(false)} className="rounded-xl">
               Cancel
             </Button>
             <Button
               variant="destructive"
               onClick={handleDeleteAccount}
               disabled={isDeleting}
+              className="rounded-xl"
               data-testid="button-confirm-delete"
             >
               {isDeleting ? "Deleting..." : "Delete Account"}

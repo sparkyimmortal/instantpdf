@@ -2,14 +2,20 @@ import { Navbar } from "@/components/Navbar";
 import { Hero } from "@/components/Hero";
 import { ToolGrid } from "@/components/ToolGrid";
 import { RecentFiles } from "@/components/RecentFiles";
+import { ProcessingHistory } from "@/components/ProcessingHistory";
+import { FavoritesBar } from "@/components/FavoritesBar";
+import { UsageStatsDashboard } from "@/components/UsageStatsDashboard";
+
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { motion } from "framer-motion";
-import { Zap, Shield, Clock, FileText, Users, Globe, ArrowRight } from "lucide-react";
+import { Zap, Shield, Clock, FileText, Users, Globe, ArrowRight, Mail, Heart } from "lucide-react";
 import { Link } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useState, useCallback } from "react";
 
 const stats = [
-  { value: "30+", label: "PDF Tools", icon: FileText },
+  { value: "50+", label: "PDF Tools", icon: FileText },
   { value: "100%", label: "Private & Secure", icon: Shield },
   { value: "<2s", label: "Processing Time", icon: Clock },
   { value: "0", label: "Files Stored", icon: Globe },
@@ -39,11 +45,20 @@ const highlights = [
 ];
 
 export default function Home() {
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleRefresh = useCallback(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    setRefreshKey((k) => k + 1);
+  }, []);
+
   return (
     <div className="min-h-screen bg-background font-sans antialiased">
       <Navbar />
-      <main>
+      <PullToRefresh onRefresh={handleRefresh}>
+        <main>
         <Hero />
+
 
         <motion.section
           initial={{ opacity: 0 }}
@@ -76,8 +91,11 @@ export default function Home() {
           </div>
         </motion.section>
 
-        <RecentFiles />
-        <ToolGrid />
+        <FavoritesBar key={`favs-${refreshKey}`} />
+        <RecentFiles key={`recent-${refreshKey}`} />
+        <ProcessingHistory key={`history-${refreshKey}`} />
+        <UsageStatsDashboard key={`stats-${refreshKey}`} />
+        <ToolGrid key={`tools-${refreshKey}`} />
 
         <motion.section
           initial={{ opacity: 0 }}
@@ -150,35 +168,81 @@ export default function Home() {
             </Card>
           </div>
         </motion.section>
-      </main>
+        </main>
 
-      <motion.footer 
+        <motion.footer 
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: true }}
-        className="border-t border-border/50 bg-muted/30 py-8 sm:py-12 text-sm text-muted-foreground"
+        className="border-t border-border/50 bg-muted/30"
       >
-        <div className="container px-4 md:px-6">
-          <div className="flex flex-col gap-6 sm:gap-8">
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
-              <div className="flex items-center gap-2">
-                <div className="bg-gradient-to-br from-cyan-500 to-blue-600 text-white p-1 rounded-lg">
+        <div className="container px-4 md:px-6 py-12 sm:py-16">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
+            <div className="col-span-2 md:col-span-1">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="bg-gradient-to-br from-cyan-500 to-blue-600 text-white p-1.5 rounded-lg">
                   <Zap className="h-4 w-4" />
                 </div>
-                <span className="font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">InstantPDF</span>
-                <span className="text-muted-foreground">&copy; 2026 All Rights Reserved</span>
+                <span className="font-bold text-lg bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">InstantPDF</span>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                Fast, private, and reliable PDF tools. Your files are never stored on our servers.
+              </p>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground/60">
+                <span>Made with</span>
+                <Heart className="h-3 w-3 text-red-400 fill-red-400" />
+                <span>for productivity</span>
               </div>
             </div>
-            <div className="flex flex-wrap justify-center sm:justify-start gap-4 sm:gap-6 text-xs sm:text-sm">
-              <Link href="/pricing" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-pricing">Pricing</Link>
-              <Link href="/privacy" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-privacy">Privacy Policy</Link>
-              <Link href="/terms" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-terms">Terms of Service</Link>
-              <Link href="/contact" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-contact">Contact</Link>
-              <Link href="/about" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-about">About</Link>
+
+            <div>
+              <h4 className="font-semibold text-sm text-foreground mb-4">Popular Tools</h4>
+              <ul className="space-y-2.5 text-sm text-muted-foreground">
+                <li><Link href="/merge-pdf" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Merge PDF</Link></li>
+                <li><Link href="/compress-pdf" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Compress PDF</Link></li>
+                <li><Link href="/split-pdf" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Split PDF</Link></li>
+                <li><Link href="/pdf-to-word" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">PDF to Word</Link></li>
+                <li><Link href="/jpg-to-pdf" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">JPG to PDF</Link></li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="font-semibold text-sm text-foreground mb-4">More Tools</h4>
+              <ul className="space-y-2.5 text-sm text-muted-foreground">
+                <li><Link href="/rotate-pdf" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Rotate PDF</Link></li>
+                <li><Link href="/watermark-pdf" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Watermark PDF</Link></li>
+                <li><Link href="/protect-pdf" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Protect PDF</Link></li>
+                <li><Link href="/ocr-pdf" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">OCR PDF</Link></li>
+                <li><Link href="/batch-process" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Batch Process</Link></li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="font-semibold text-sm text-foreground mb-4">Company</h4>
+              <ul className="space-y-2.5 text-sm text-muted-foreground">
+                <li><Link href="/pricing" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-pricing">Pricing</Link></li>
+                <li><Link href="/about" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-about">About</Link></li>
+                <li><Link href="/blog" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-blog">Blog</Link></li>
+                <li><Link href="/contact" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-contact">Contact</Link></li>
+                <li><Link href="/privacy" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-privacy">Privacy Policy</Link></li>
+                <li><Link href="/terms" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-terms">Terms of Service</Link></li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="border-t border-border/40 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <p className="text-xs text-muted-foreground/60">&copy; 2026 InstantPDF. All rights reserved.</p>
+            <div className="flex items-center gap-4 text-xs text-muted-foreground/60">
+              <Link href="/contact" className="flex items-center gap-1 hover:text-cyan-500 transition-colors">
+                <Mail className="h-3 w-3" />
+                <span>Support</span>
+              </Link>
+              <span>instantpdf.in</span>
             </div>
           </div>
         </div>
-      </motion.footer>
+        </motion.footer>
+      </PullToRefresh>
     </div>
   );
 }

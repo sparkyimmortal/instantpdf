@@ -9,6 +9,7 @@ import { ToolLayout } from "@/components/ToolLayout";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { pdfFetch, formatPdfError, downloadPdfFile } from "@/lib/pdfApi";
+import { SwipeToDelete } from "@/components/SwipeToDelete";
 import {
   Select,
   SelectContent,
@@ -17,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type Operation = "compress" | "rotate" | "flatten" | "watermark";
+type Operation = "compress" | "rotate" | "flatten" | "watermark" | "encrypt" | "page-numbers" | "to-jpg" | "to-png";
 
 export default function BatchProcess() {
   const [files, setFiles] = useState<File[]>([]);
@@ -25,6 +26,7 @@ export default function BatchProcess() {
   const [compressionLevel, setCompressionLevel] = useState("medium");
   const [rotateDegrees, setRotateDegrees] = useState("90");
   const [watermarkText, setWatermarkText] = useState("CONFIDENTIAL");
+  const [encryptPassword, setEncryptPassword] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
@@ -63,6 +65,8 @@ export default function BatchProcess() {
         formData.append("degrees", rotateDegrees);
       } else if (operation === "watermark") {
         formData.append("text", watermarkText);
+      } else if (operation === "encrypt") {
+        formData.append("password", encryptPassword);
       }
 
       const response = await pdfFetch("/api/pdf/batch", {
@@ -173,24 +177,25 @@ export default function BatchProcess() {
                   {files.length} file{files.length !== 1 ? "s" : ""} selected
                 </h3>
                 {files.map((f, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 border border-border rounded-lg bg-muted/20"
-                    data-testid={`file-row-${index}`}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <FileText className="w-4 h-4 text-orange-500 shrink-0" />
-                      <span className="text-sm font-medium truncate" data-testid={`text-filename-${index}`}>{f.name}</span>
-                      <span className="text-xs text-muted-foreground shrink-0">{formatSize(f.size)}</span>
-                    </div>
-                    <button
-                      onClick={() => removeFile(index)}
-                      className="text-muted-foreground hover:text-destructive shrink-0 ml-2"
-                      data-testid={`button-remove-file-${index}`}
+                  <SwipeToDelete key={index} onDelete={() => removeFile(index)}>
+                    <div
+                      className="flex items-center justify-between p-3 border border-border rounded-lg bg-muted/20"
+                      data-testid={`file-row-${index}`}
                     >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="w-4 h-4 text-orange-500 shrink-0" />
+                        <span className="text-sm font-medium truncate" data-testid={`text-filename-${index}`}>{f.name}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">{formatSize(f.size)}</span>
+                      </div>
+                      <button
+                        onClick={() => removeFile(index)}
+                        className="text-muted-foreground hover:text-destructive shrink-0 ml-2"
+                        data-testid={`button-remove-file-${index}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </SwipeToDelete>
                 ))}
               </div>
             )}
@@ -211,6 +216,10 @@ export default function BatchProcess() {
                     <SelectItem value="rotate">Rotate</SelectItem>
                     <SelectItem value="flatten">Flatten</SelectItem>
                     <SelectItem value="watermark">Add Watermark</SelectItem>
+                    <SelectItem value="encrypt">Encrypt / Protect</SelectItem>
+                    <SelectItem value="page-numbers">Add Page Numbers</SelectItem>
+                    <SelectItem value="to-jpg">Convert to JPG</SelectItem>
+                    <SelectItem value="to-png">Convert to PNG</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -255,6 +264,19 @@ export default function BatchProcess() {
                     onChange={(e) => setWatermarkText(e.target.value)}
                     placeholder="Enter watermark text"
                     data-testid="input-watermark-text"
+                  />
+                </div>
+              )}
+
+              {operation === "encrypt" && (
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Password</Label>
+                  <Input
+                    type="password"
+                    value={encryptPassword}
+                    onChange={(e) => setEncryptPassword(e.target.value)}
+                    placeholder="Enter password"
+                    data-testid="input-encrypt-password"
                   />
                 </div>
               )}

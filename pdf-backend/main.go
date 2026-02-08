@@ -11,6 +11,7 @@ import (
         "hash/crc32"
         "io"
         "log"
+        "math"
         "mime/multipart"
         "net/http"
         "os"
@@ -21,7 +22,14 @@ import (
         "strings"
         "time"
 
+        "image"
+        "image/draw"
+        _ "image/gif"
+        "image/jpeg"
+        _ "image/png"
+
         "github.com/google/uuid"
+        "github.com/jung-kurt/gofpdf"
 )
 
 var baseWorkDir = "./work"  // Will be converted to absolute path in main()
@@ -169,6 +177,8 @@ func main() {
         mux.HandleFunc("/pdf/markdown-to-pdf", handleMarkdownToPDF)
         mux.HandleFunc("/api/pdf/document-crop", handleDocumentCrop)
         mux.HandleFunc("/pdf/document-crop", handleDocumentCrop)
+        mux.HandleFunc("/api/pdf/document-detect", handleDocumentDetect)
+        mux.HandleFunc("/pdf/document-detect", handleDocumentDetect)
         mux.HandleFunc("/api/pdf/url-to-pdf", handleURLToPDF)
         mux.HandleFunc("/pdf/url-to-pdf", handleURLToPDF)
 
@@ -343,6 +353,9 @@ func handleDocumentCrop(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "image is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -360,42 +373,510 @@ func handleDocumentCrop(w http.ResponseWriter, r *http.Request) {
                 return
         }
 
-        outPath := filepath.Join(dir, "cropped.jpg")
-
-        // Use ImageMagick to auto-detect and crop the document:
-        // 1. -fuzz 15% allows for slight color variations in the background
-        // 2. -trim removes the background border
-        // 3. +repage resets the virtual canvas
-        // 4. -gravity center -extent to add a small margin back
-        if err := runCommand(dir, "convert", inPath,
-                "-fuzz", "20%",
-                "-trim",
-                "+repage",
-                "-bordercolor", "white",
-                "-border", "10",
-                "-quality", "95",
-                outPath); err != nil {
-                // If trim fails, try a simpler approach: just enhance contrast
-                log.Printf("document crop trim failed, trying fallback: %v", err)
-                if err2 := runCommand(dir, "convert", inPath,
-                        "-normalize",
-                        "-sharpen", "0x1",
-                        "-quality", "95",
-                        outPath); err2 != nil {
-                        log.Printf("document crop fallback also failed: %v", err2)
-                        errorJSON(w, http.StatusInternalServerError, "failed to crop document")
-                        return
-                }
+        f, err := os.Open(inPath)
+        if err != nil {
+                errorJSON(w, http.StatusInternalServerError, "failed to open image")
+                return
         }
-
-        // Check if the cropped image exists and is valid
-        if _, statErr := os.Stat(outPath); statErr != nil {
-                errorJSON(w, http.StatusInternalServerError, "cropped image not found")
+        srcImg, _, err := image.Decode(f)
+        f.Close()
+        if err != nil {
+                errorJSON(w, http.StatusInternalServerError, "failed to decode image")
                 return
         }
 
+        cropped := detectAndCropDocument(srcImg)
+
+        outPath := filepath.Join(dir, "cropped.jpg")
+        outFile, err := os.Create(outPath)
+        if err != nil {
+                errorJSON(w, http.StatusInternalServerError, "failed to create output")
+                return
+        }
+        if err := jpeg.Encode(outFile, cropped, &jpeg.Options{Quality: 95}); err != nil {
+                outFile.Close()
+                errorJSON(w, http.StatusInternalServerError, "failed to encode cropped image")
+                return
+        }
+        outFile.Close()
+
         outName := "cropped.jpg"
         writeJSON(w, http.StatusOK, downloadResponse{DownloadURL: buildDownloadURL(r, jobID, outName)})
+}
+
+func handleDocumentDetect(w http.ResponseWriter, r *http.Request) {
+        if r.Method != http.MethodPost {
+                errorJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+                return
+        }
+        if err := r.ParseMultipartForm(10 << 20); err != nil {
+                errorJSON(w, http.StatusBadRequest, "invalid multipart form")
+                return
+        }
+
+        _, header, err := r.FormFile("image")
+        if err != nil {
+                errorJSON(w, http.StatusBadRequest, "image is required")
+                return
+        }
+	if !checkFileSize(w, r, header) {
+		return
+	}
+
+        file, err := header.Open()
+        if err != nil {
+                errorJSON(w, http.StatusInternalServerError, "failed to open image")
+                return
+        }
+        defer file.Close()
+
+        srcImg, _, err := image.Decode(file)
+        if err != nil {
+                errorJSON(w, http.StatusInternalServerError, "failed to decode image")
+                return
+        }
+
+        detected, x, y, bw, bh := detectDocumentBounds(srcImg)
+
+        type detectResult struct {
+                Detected bool    `json:"detected"`
+                X        float64 `json:"x"`
+                Y        float64 `json:"y"`
+                Width    float64 `json:"width"`
+                Height   float64 `json:"height"`
+        }
+
+        writeJSON(w, http.StatusOK, detectResult{
+                Detected: detected,
+                X:        x,
+                Y:        y,
+                Width:    bw,
+                Height:   bh,
+        })
+}
+
+func detectDocumentBounds(src image.Image) (bool, float64, float64, float64, float64) {
+        bounds := src.Bounds()
+        origW, origH := bounds.Dx(), bounds.Dy()
+
+        maxDim := 200
+        scale := 1.0
+        if origW > maxDim || origH > maxDim {
+                if origW > origH {
+                        scale = float64(maxDim) / float64(origW)
+                } else {
+                        scale = float64(maxDim) / float64(origH)
+                }
+        }
+        sw := int(float64(origW) * scale)
+        sh := int(float64(origH) * scale)
+        if sw < 2 {
+                sw = 2
+        }
+        if sh < 2 {
+                sh = 2
+        }
+
+        gray := make([][]float64, sh)
+        for y := 0; y < sh; y++ {
+                gray[y] = make([]float64, sw)
+                for x := 0; x < sw; x++ {
+                        ox := int(float64(x)/scale) + bounds.Min.X
+                        oy := int(float64(y)/scale) + bounds.Min.Y
+                        if ox >= bounds.Max.X {
+                                ox = bounds.Max.X - 1
+                        }
+                        if oy >= bounds.Max.Y {
+                                oy = bounds.Max.Y - 1
+                        }
+                        r, g, b, _ := src.At(ox, oy).RGBA()
+                        gray[y][x] = float64(r*299+g*587+b*114) / (1000.0 * 65535.0)
+                }
+        }
+
+        blurred := docGaussianBlur(gray, sw, sh)
+        edgeMag := docSobelEdges(blurred, sw, sh)
+        thresh := docOtsuThreshold(blurred, sw, sh)
+
+        binary := make([][]bool, sh)
+        for y := 0; y < sh; y++ {
+                binary[y] = make([]bool, sw)
+                for x := 0; x < sw; x++ {
+                        binary[y][x] = blurred[y][x] > thresh
+                }
+        }
+
+        closed := docMorphClose(binary, sw, sh, 5)
+        bestX, bestY, bestW, bestH := docFindLargestComponent(closed, sw, sh)
+
+        detectedArea := float64(bestW*bestH) / float64(sw*sh)
+        if detectedArea < 0.05 {
+                bestX, bestY, bestW, bestH = docFindByEdgeProjection(edgeMag, sw, sh)
+                detectedArea = float64(bestW*bestH) / float64(sw*sh)
+        }
+
+        if detectedArea < 0.08 || detectedArea > 0.85 || bestW < 10 || bestH < 10 {
+                return false, 0, 0, 0, 0
+        }
+
+        nx := float64(bestX) / float64(sw)
+        ny := float64(bestY) / float64(sh)
+        nw := float64(bestW) / float64(sw)
+        nh := float64(bestH) / float64(sh)
+
+        return true, nx, ny, nw, nh
+}
+
+func detectAndCropDocument(src image.Image) image.Image {
+        bounds := src.Bounds()
+        origW, origH := bounds.Dx(), bounds.Dy()
+
+        maxDim := 500
+        scale := 1.0
+        if origW > maxDim || origH > maxDim {
+                if origW > origH {
+                        scale = float64(maxDim) / float64(origW)
+                } else {
+                        scale = float64(maxDim) / float64(origH)
+                }
+        }
+        sw := int(float64(origW) * scale)
+        sh := int(float64(origH) * scale)
+        if sw < 2 {
+                sw = 2
+        }
+        if sh < 2 {
+                sh = 2
+        }
+
+        gray := make([][]float64, sh)
+        for y := 0; y < sh; y++ {
+                gray[y] = make([]float64, sw)
+                for x := 0; x < sw; x++ {
+                        ox := int(float64(x)/scale) + bounds.Min.X
+                        oy := int(float64(y)/scale) + bounds.Min.Y
+                        if ox >= bounds.Max.X {
+                                ox = bounds.Max.X - 1
+                        }
+                        if oy >= bounds.Max.Y {
+                                oy = bounds.Max.Y - 1
+                        }
+                        r, g, b, _ := src.At(ox, oy).RGBA()
+                        gray[y][x] = float64(r*299+g*587+b*114) / (1000.0 * 65535.0)
+                }
+        }
+
+        blurred := docGaussianBlur(gray, sw, sh)
+
+        edgeMag := docSobelEdges(blurred, sw, sh)
+
+        thresh := docOtsuThreshold(blurred, sw, sh)
+
+        binary := make([][]bool, sh)
+        for y := 0; y < sh; y++ {
+                binary[y] = make([]bool, sw)
+                for x := 0; x < sw; x++ {
+                        binary[y][x] = blurred[y][x] > thresh
+                }
+        }
+
+        closed := docMorphClose(binary, sw, sh, 5)
+
+        bestX, bestY, bestW, bestH := docFindLargestComponent(closed, sw, sh)
+
+        detectedArea := float64(bestW*bestH) / float64(sw*sh)
+        if detectedArea < 0.05 {
+                bestX, bestY, bestW, bestH = docFindByEdgeProjection(edgeMag, sw, sh)
+                detectedArea = float64(bestW*bestH) / float64(sw*sh)
+        }
+
+        if detectedArea < 0.03 || detectedArea > 0.98 || bestW < 10 || bestH < 10 {
+                return src
+        }
+
+        margin := int(math.Max(float64(sw), float64(sh)) * 0.02)
+        bestX -= margin
+        bestY -= margin
+        bestW += 2 * margin
+        bestH += 2 * margin
+
+        ox := int(float64(bestX) / scale)
+        oy := int(float64(bestY) / scale)
+        ow := int(float64(bestW) / scale)
+        oh := int(float64(bestH) / scale)
+
+        if ox < 0 {
+                ox = 0
+        }
+        if oy < 0 {
+                oy = 0
+        }
+        if ox+ow > origW {
+                ow = origW - ox
+        }
+        if oy+oh > origH {
+                oh = origH - oy
+        }
+        if ow <= 0 || oh <= 0 {
+                return src
+        }
+
+        cropRect := image.Rect(ox+bounds.Min.X, oy+bounds.Min.Y, ox+ow+bounds.Min.X, oy+oh+bounds.Min.Y)
+        dst := image.NewRGBA(image.Rect(0, 0, ow, oh))
+        draw.Draw(dst, dst.Bounds(), src, cropRect.Min, draw.Src)
+        return dst
+}
+
+func docGaussianBlur(gray [][]float64, w, h int) [][]float64 {
+        kernel := [5][5]float64{
+                {1, 4, 6, 4, 1},
+                {4, 16, 24, 16, 4},
+                {6, 24, 36, 24, 6},
+                {4, 16, 24, 16, 4},
+                {1, 4, 6, 4, 1},
+        }
+        kSum := 256.0
+
+        out := make([][]float64, h)
+        for y := 0; y < h; y++ {
+                out[y] = make([]float64, w)
+                for x := 0; x < w; x++ {
+                        if y < 2 || y >= h-2 || x < 2 || x >= w-2 {
+                                out[y][x] = gray[y][x]
+                                continue
+                        }
+                        sum := 0.0
+                        for ky := -2; ky <= 2; ky++ {
+                                for kx := -2; kx <= 2; kx++ {
+                                        sum += gray[y+ky][x+kx] * kernel[ky+2][kx+2]
+                                }
+                        }
+                        out[y][x] = sum / kSum
+                }
+        }
+        return out
+}
+
+func docSobelEdges(gray [][]float64, w, h int) [][]float64 {
+        edges := make([][]float64, h)
+        for y := 0; y < h; y++ {
+                edges[y] = make([]float64, w)
+        }
+        for y := 1; y < h-1; y++ {
+                for x := 1; x < w-1; x++ {
+                        gx := -gray[y-1][x-1] - 2*gray[y][x-1] - gray[y+1][x-1] +
+                                gray[y-1][x+1] + 2*gray[y][x+1] + gray[y+1][x+1]
+                        gy := -gray[y-1][x-1] - 2*gray[y-1][x] - gray[y-1][x+1] +
+                                gray[y+1][x-1] + 2*gray[y+1][x] + gray[y+1][x+1]
+                        edges[y][x] = math.Sqrt(gx*gx + gy*gy)
+                }
+        }
+        return edges
+}
+
+func docOtsuThreshold(gray [][]float64, w, h int) float64 {
+        bins := 256
+        hist := make([]int, bins)
+        total := 0
+        for y := 0; y < h; y++ {
+                for x := 0; x < w; x++ {
+                        idx := int(gray[y][x] * 255)
+                        if idx > 255 {
+                                idx = 255
+                        }
+                        if idx < 0 {
+                                idx = 0
+                        }
+                        hist[idx]++
+                        total++
+                }
+        }
+
+        sumAll := 0.0
+        for i := 0; i < bins; i++ {
+                sumAll += float64(i) * float64(hist[i])
+        }
+
+        sumB := 0.0
+        wB := 0
+        maxVariance := 0.0
+        bestThresh := 0
+
+        for t := 0; t < bins; t++ {
+                wB += hist[t]
+                if wB == 0 {
+                        continue
+                }
+                wF := total - wB
+                if wF == 0 {
+                        break
+                }
+                sumB += float64(t) * float64(hist[t])
+                mB := sumB / float64(wB)
+                mF := (sumAll - sumB) / float64(wF)
+                variance := float64(wB) * float64(wF) * (mB - mF) * (mB - mF)
+                if variance > maxVariance {
+                        maxVariance = variance
+                        bestThresh = t
+                }
+        }
+
+        return float64(bestThresh) / 255.0
+}
+
+func docMorphClose(binary [][]bool, w, h, radius int) [][]bool {
+        dilated := make([][]bool, h)
+        for y := 0; y < h; y++ {
+                dilated[y] = make([]bool, w)
+                for x := 0; x < w; x++ {
+                        found := false
+                        for dy := -radius; dy <= radius && !found; dy++ {
+                                for dx := -radius; dx <= radius && !found; dx++ {
+                                        ny, nx := y+dy, x+dx
+                                        if ny >= 0 && ny < h && nx >= 0 && nx < w && binary[ny][nx] {
+                                                found = true
+                                        }
+                                }
+                        }
+                        dilated[y][x] = found
+                }
+        }
+
+        eroded := make([][]bool, h)
+        for y := 0; y < h; y++ {
+                eroded[y] = make([]bool, w)
+                for x := 0; x < w; x++ {
+                        allSet := true
+                        for dy := -radius; dy <= radius && allSet; dy++ {
+                                for dx := -radius; dx <= radius && allSet; dx++ {
+                                        ny, nx := y+dy, x+dx
+                                        if ny < 0 || ny >= h || nx < 0 || nx >= w || !dilated[ny][nx] {
+                                                allSet = false
+                                        }
+                                }
+                        }
+                        eroded[y][x] = allSet
+                }
+        }
+        return eroded
+}
+
+func docFindLargestComponent(binary [][]bool, w, h int) (int, int, int, int) {
+        visited := make([][]bool, h)
+        for y := 0; y < h; y++ {
+                visited[y] = make([]bool, w)
+        }
+
+        bestArea := 0
+        bestX0, bestY0, bestX1, bestY1 := 0, 0, 0, 0
+
+        for sy := 0; sy < h; sy++ {
+                for sx := 0; sx < w; sx++ {
+                        if visited[sy][sx] || !binary[sy][sx] {
+                                continue
+                        }
+
+                        stack := []struct{ x, y int }{{sx, sy}}
+                        visited[sy][sx] = true
+                        area := 0
+                        minX, minY, maxX, maxY := sx, sy, sx, sy
+
+                        for len(stack) > 0 {
+                                p := stack[len(stack)-1]
+                                stack = stack[:len(stack)-1]
+                                area++
+
+                                if p.x < minX {
+                                        minX = p.x
+                                }
+                                if p.x > maxX {
+                                        maxX = p.x
+                                }
+                                if p.y < minY {
+                                        minY = p.y
+                                }
+                                if p.y > maxY {
+                                        maxY = p.y
+                                }
+
+                                for _, d := range [][2]int{{-1, 0}, {1, 0}, {0, -1}, {0, 1}} {
+                                        nx, ny := p.x+d[0], p.y+d[1]
+                                        if nx >= 0 && nx < w && ny >= 0 && ny < h && !visited[ny][nx] && binary[ny][nx] {
+                                                visited[ny][nx] = true
+                                                stack = append(stack, struct{ x, y int }{nx, ny})
+                                        }
+                                }
+                        }
+
+                        if area > bestArea {
+                                bestArea = area
+                                bestX0 = minX
+                                bestY0 = minY
+                                bestX1 = maxX
+                                bestY1 = maxY
+                        }
+                }
+        }
+
+        return bestX0, bestY0, bestX1 - bestX0 + 1, bestY1 - bestY0 + 1
+}
+
+func docFindByEdgeProjection(edgeMag [][]float64, w, h int) (int, int, int, int) {
+        xProj := make([]float64, w)
+        yProj := make([]float64, h)
+
+        for y := 0; y < h; y++ {
+                for x := 0; x < w; x++ {
+                        xProj[x] += edgeMag[y][x]
+                        yProj[y] += edgeMag[y][x]
+                }
+        }
+
+        xMean := 0.0
+        for x := 0; x < w; x++ {
+                xMean += xProj[x]
+        }
+        xMean /= float64(w)
+
+        yMean := 0.0
+        for y := 0; y < h; y++ {
+                yMean += yProj[y]
+        }
+        yMean /= float64(h)
+
+        xThresh := xMean * 0.5
+        yThresh := yMean * 0.5
+
+        left := 0
+        for x := 0; x < w/2; x++ {
+                if xProj[x] > xThresh {
+                        left = x
+                        break
+                }
+        }
+        right := w - 1
+        for x := w - 1; x >= w/2; x-- {
+                if xProj[x] > xThresh {
+                        right = x
+                        break
+                }
+        }
+        top := 0
+        for y := 0; y < h/2; y++ {
+                if yProj[y] > yThresh {
+                        top = y
+                        break
+                }
+        }
+        bottom := h - 1
+        for y := h - 1; y >= h/2; y-- {
+                if yProj[y] > yThresh {
+                        bottom = y
+                        break
+                }
+        }
+
+        return left, top, right - left + 1, bottom - top + 1
 }
 
 func handleRotate(w http.ResponseWriter, r *http.Request) {
@@ -413,6 +894,9 @@ func handleRotate(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         degrees := parseIntDefault(r.FormValue("degrees"), 90)
         if degrees != 90 && degrees != 180 && degrees != 270 {
@@ -459,6 +943,9 @@ func handleCrop(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         desc := strings.TrimSpace(r.FormValue("description"))
         unit := strings.TrimSpace(r.FormValue("unit"))
@@ -524,6 +1011,9 @@ func handlePageNumbers(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         pos := strings.TrimSpace(r.FormValue("position"))
         if pos == "" {
@@ -670,6 +1160,9 @@ func handleWatermark(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         text := strings.TrimSpace(r.FormValue("text"))
         if text == "" {
@@ -678,8 +1171,7 @@ func handleWatermark(w http.ResponseWriter, r *http.Request) {
         }
 
         rot := parseIntDefault(r.FormValue("rotation"), 45)
-        fontSize := 48
-        opacity := parseFloatDefault(r.FormValue("opacity"), 0.25)
+        opacity := parseFloatDefault(r.FormValue("opacity"), 0.5)
         if opacity < 0 {
                 opacity = 0
         }
@@ -739,7 +1231,7 @@ func handleWatermark(w http.ResponseWriter, r *http.Request) {
                 }
         }
         
-        desc := fmt.Sprintf("pos:c, rot:%d, points:%d, scale:1 abs, op:%.2f, %s", actualRot, fontSize, opacity, colorDesc)
+        desc := fmt.Sprintf("pos:c, rot:%d, scale:0.9 rel, op:%.2f, %s", actualRot, opacity, colorDesc)
         
         var args []string
         if layer == "over" {
@@ -778,6 +1270,9 @@ func handleHeaderFooter(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         headerText := strings.TrimSpace(r.FormValue("headerText"))
         footerText := strings.TrimSpace(r.FormValue("footerText"))
@@ -917,6 +1412,9 @@ func handleOrganize(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         order := strings.TrimSpace(r.FormValue("order"))
         if order == "" {
@@ -1040,6 +1538,50 @@ func buildDownloadURL(r *http.Request, jobID, filename string) string {
         return fmt.Sprintf("/downloads/%s/%s", jobID, filename)
 }
 
+func getMaxFileSizeBytes(r *http.Request) int64 {
+        plan := r.Header.Get("X-PDF-User-Plan")
+        switch plan {
+        case "pro":
+                return 0 // no limit
+        case "free":
+                return 11 * 1024 * 1024 // 11MB
+        default:
+                return 7 * 1024 * 1024 // 7MB anonymous
+        }
+}
+
+func checkFileSize(w http.ResponseWriter, r *http.Request, header *multipart.FileHeader) bool {
+        maxSize := getMaxFileSizeBytes(r)
+        if maxSize <= 0 {
+                return true // no limit (pro)
+        }
+        if header.Size > maxSize {
+                plan := r.Header.Get("X-PDF-User-Plan")
+                sizeMB := float64(header.Size) / 1024 / 1024
+                limitMB := float64(maxSize) / 1024 / 1024
+                if plan == "anonymous" || plan == "" {
+                        errorJSON(w, http.StatusUnauthorized, fmt.Sprintf(
+                                "File \"%s\" is %.1fMB. Please log in to upload files up to 11MB.",
+                                header.Filename, sizeMB))
+                } else {
+                        errorJSON(w, http.StatusRequestEntityTooLarge, fmt.Sprintf(
+                                "File \"%s\" is %.1fMB which exceeds the %.0fMB per-file limit. Upgrade to Pro for unlimited file sizes.",
+                                header.Filename, sizeMB, limitMB))
+                }
+                return false
+        }
+        return true
+}
+
+func checkMultipleFileSizes(w http.ResponseWriter, r *http.Request, headers []*multipart.FileHeader) bool {
+        for _, h := range headers {
+                if !checkFileSize(w, r, h) {
+                        return false
+                }
+        }
+        return true
+}
+
 func saveUploadedFile(fileHeader *multipart.FileHeader, dst string) error {
         src, err := fileHeader.Open()
         if err != nil {
@@ -1152,6 +1694,9 @@ func handleMerge(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "no files provided")
                 return
         }
+	if !checkMultipleFileSizes(w, r, files) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -1202,6 +1747,9 @@ func handleSplit(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
         file.Close()
 
         jobID, dir, err := newJobDir()
@@ -1405,6 +1953,9 @@ func handleRemovePages(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -1452,6 +2003,9 @@ func handleExtractPages(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -1520,6 +2074,9 @@ func handleCompress(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -1644,6 +2201,9 @@ func handleRepair(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -1686,6 +2246,9 @@ func handleOCR(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -1733,6 +2296,9 @@ func handleImageToPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "no files provided")
                 return
         }
+	if !checkMultipleFileSizes(w, r, files) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -1756,8 +2322,61 @@ func handleImageToPDF(w http.ResponseWriter, r *http.Request) {
         }
         outPath := filepath.Join(dir, outName)
 
-        args := append(imagePaths, outPath)
-        if err := runCommand(dir, "convert", args...); err != nil {
+        pdf := gofpdf.New("P", "pt", "A4", "")
+        pdf.SetMargins(0, 0, 0)
+        pdf.SetAutoPageBreak(false, 0)
+
+        for _, imgPath := range imagePaths {
+                f, err := os.Open(imgPath)
+                if err != nil {
+                        log.Printf("image to pdf: failed to open %s: %v", imgPath, err)
+                        errorJSON(w, http.StatusInternalServerError, "failed to convert images")
+                        return
+                }
+                imgConfig, _, err := image.DecodeConfig(f)
+                f.Close()
+                if err != nil {
+                        log.Printf("image to pdf: failed to decode config %s: %v", imgPath, err)
+                        errorJSON(w, http.StatusInternalServerError, "failed to convert images")
+                        return
+                }
+
+                imgW := float64(imgConfig.Width)
+                imgH := float64(imgConfig.Height)
+
+                pageW := 595.28
+                pageH := 841.89
+
+                scaleW := pageW / imgW
+                scaleH := pageH / imgH
+                scale := scaleW
+                if scaleH < scaleW {
+                        scale = scaleH
+                }
+
+                drawW := imgW * scale
+                drawH := imgH * scale
+                x := (pageW - drawW) / 2
+                y := (pageH - drawH) / 2
+
+                pdf.AddPage()
+
+                ext := strings.ToLower(filepath.Ext(imgPath))
+                var imgType string
+                switch ext {
+                case ".png":
+                        imgType = "PNG"
+                case ".gif":
+                        imgType = "GIF"
+                default:
+                        imgType = "JPEG"
+                }
+
+                opt := gofpdf.ImageOptions{ImageType: imgType, ReadDpi: true}
+                pdf.ImageOptions(imgPath, x, y, drawW, drawH, false, opt, 0, "")
+        }
+
+        if err := pdf.OutputFileAndClose(outPath); err != nil {
                 log.Printf("image to pdf error: %v", err)
                 errorJSON(w, http.StatusInternalServerError, "failed to convert images")
                 return
@@ -1781,6 +2400,9 @@ func handleWordToPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -1829,6 +2451,9 @@ func handlePreview(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -2052,6 +2677,9 @@ func handleProtectPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
+	if !checkFileSize(w, r, hdr) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -2109,6 +2737,9 @@ func handleUnlockPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
+	if !checkFileSize(w, r, hdr) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -2202,6 +2833,9 @@ func handleRedactPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
+	if !checkFileSize(w, r, hdr) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -2361,6 +2995,9 @@ func handleFlattenPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
+	if !checkFileSize(w, r, hdr) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -2421,6 +3058,9 @@ func handlePDFToWord(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
+	if !checkFileSize(w, r, hdr) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -2532,6 +3172,9 @@ func handlePDFToExcel(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
+	if !checkFileSize(w, r, hdr) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -2654,6 +3297,9 @@ func handlePDFToPowerPoint(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
+	if !checkFileSize(w, r, hdr) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -2747,6 +3393,9 @@ func handleExcelToPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
+	if !checkFileSize(w, r, hdr) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -2815,6 +3464,9 @@ func handlePowerPointToPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
+	if !checkFileSize(w, r, hdr) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -2885,6 +3537,9 @@ func handlePDFToJPG(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
+	if !checkFileSize(w, r, hdr) {
+		return
+	}
 
         // Optional DPI parameter (default 150)
         dpi := parseIntDefault(r.FormValue("dpi"), 150)
@@ -3011,6 +3666,9 @@ func handleExtractText(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
+	if !checkFileSize(w, r, hdr) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -3061,6 +3719,9 @@ func handleExtractImages(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
+	if !checkFileSize(w, r, hdr) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -3157,6 +3818,9 @@ func handleHTMLToPDF(w http.ResponseWriter, r *http.Request) {
                         errorJSON(w, http.StatusBadRequest, "file, html content, or url required")
                         return
                 }
+	if !checkFileSize(w, r, hdr) {
+		return
+	}
 
                 inputPath := filepath.Join(dir, "input.html")
                 if err := saveUploadedFile(hdr, inputPath); err != nil {
@@ -3310,6 +3974,9 @@ func handleDigitalSignature(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         signature := r.FormValue("signature")
         page := parseIntDefault(r.FormValue("page"), 1)
@@ -3405,6 +4072,9 @@ func handleSignPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         signaturesJSON := r.FormValue("signatures")
         log.Printf("[sign] Received signatures JSON (length %d): %s", len(signaturesJSON), signaturesJSON)
@@ -3593,6 +4263,9 @@ func handleAddTextAnnotation(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         text := r.FormValue("text")
         if text == "" {
@@ -3776,6 +4449,9 @@ func handleValidatePDFA(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -3852,6 +4528,9 @@ func handlePDFToHTML(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -3944,6 +4623,9 @@ func handleAddHeaderFooter(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -4074,6 +4756,9 @@ func handleConvertToPDFA(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -4129,6 +4814,9 @@ func handleEditPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, header) {
+		return
+	}
 
         annotationsJSON := r.FormValue("annotations")
         
@@ -4442,6 +5130,9 @@ func handlePNGToPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "no files provided")
                 return
         }
+	if !checkMultipleFileSizes(w, r, files) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -4487,6 +5178,9 @@ func handlePDFToPNG(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, hdr) {
+		return
+	}
 
         dpi := parseIntDefault(r.FormValue("dpi"), 300)
         if dpi < 72 {
@@ -4560,6 +5254,9 @@ func handlePDFToTIFF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, hdr) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -4614,6 +5311,9 @@ func handleBMPToPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "no files provided")
                 return
         }
+	if !checkMultipleFileSizes(w, r, files) {
+		return
+	}
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -4666,6 +5366,9 @@ func handleEncryptPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, hdr) {
+		return
+	}
 
         permissions := strings.TrimSpace(r.FormValue("permissions"))
 
@@ -4732,6 +5435,9 @@ func handleMetadataEditor(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, hdr) {
+		return
+	}
 
         action := strings.TrimSpace(r.FormValue("action"))
         if action == "" {
@@ -4849,6 +5555,9 @@ func handleBookmarksEditor(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, hdr) {
+		return
+	}
 
         bookmarksJSON := strings.TrimSpace(r.FormValue("bookmarks"))
         if bookmarksJSON == "" {
@@ -4956,6 +5665,9 @@ func handleBatchProcess(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "no files provided")
                 return
         }
+	if !checkMultipleFileSizes(w, r, files) {
+		return
+	}
 
         operation := strings.TrimSpace(r.FormValue("operation"))
         if operation == "" {
@@ -5018,8 +5730,51 @@ func handleBatchProcess(w http.ResponseWriter, r *http.Request) {
                         if text == "" {
                                 text = "WATERMARK"
                         }
-                        desc := "pos:c, rot:45, points:48, scale:1 abs, op:0.25, fillc:.5 .5 .5"
+                        desc := "pos:c, rot:45, scale:0.9 rel, op:0.25, fillc:.5 .5 .5"
                         cmdErr = runCommand(dir, "pdfcpu", "watermark", "add", "-mode", "text", "--", text, desc, inPath, outPath)
+                case "encrypt":
+                        password := strings.TrimSpace(r.FormValue("password"))
+                        if password == "" {
+                                password = "password"
+                        }
+                        cmdErr = runCommand(dir, "qpdf", "--warning-exit-0", "--encrypt", password, password, "256", "--", inPath, outPath)
+                case "page-numbers":
+                        if err := copyFileEdit(inPath, outPath); err != nil {
+                                log.Printf("[batch] copy error: %v", err)
+                                errorJSON(w, http.StatusInternalServerError, "failed to prepare file")
+                                return
+                        }
+                        desc := "pos:bc, rot:0, points:10, scale:1 abs, op:1, fillc:0 0 0"
+                        cmdErr = runCommand(dir, "pdfcpu", "stamp", "add", "-mode", "text", "--", "%p", desc, outPath)
+                case "to-jpg":
+                        pageOutDir := filepath.Join(dir, fmt.Sprintf("jpgout_%d", i))
+                        os.MkdirAll(pageOutDir, 0o755)
+                        cmdErr = runCommand(dir, "pdftoppm", "-jpeg", "-r", "200", inPath, filepath.Join(pageOutDir, "page"))
+                        if cmdErr == nil {
+                                jpgFiles, _ := filepath.Glob(filepath.Join(pageOutDir, "*.jpg"))
+                                if len(jpgFiles) == 0 {
+                                        jpgFiles, _ = filepath.Glob(filepath.Join(pageOutDir, "*.jpeg"))
+                                }
+                                if len(jpgFiles) > 0 {
+                                        baseName := strings.TrimSuffix(fh.Filename, filepath.Ext(fh.Filename))
+                                        jpgZip := filepath.Join(outputDir, baseName+"_images.zip")
+                                        zipDirectory(pageOutDir, jpgZip)
+                                }
+                        }
+                        continue
+                case "to-png":
+                        pageOutDir := filepath.Join(dir, fmt.Sprintf("pngout_%d", i))
+                        os.MkdirAll(pageOutDir, 0o755)
+                        cmdErr = runCommand(dir, "pdftoppm", "-png", "-r", "200", inPath, filepath.Join(pageOutDir, "page"))
+                        if cmdErr == nil {
+                                pngFiles, _ := filepath.Glob(filepath.Join(pageOutDir, "*.png"))
+                                if len(pngFiles) > 0 {
+                                        baseName := strings.TrimSuffix(fh.Filename, filepath.Ext(fh.Filename))
+                                        pngZip := filepath.Join(outputDir, baseName+"_images.zip")
+                                        zipDirectory(pageOutDir, pngZip)
+                                }
+                        }
+                        continue
                 default:
                         errorJSON(w, http.StatusBadRequest, "unsupported operation: "+operation)
                         return
@@ -5058,6 +5813,9 @@ func handleFormFill(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
+	if !checkFileSize(w, r, hdr) {
+		return
+	}
 
         action := strings.TrimSpace(r.FormValue("action"))
         if action == "" {
@@ -5206,6 +5964,9 @@ func handleMarkdownToPDF(w http.ResponseWriter, r *http.Request) {
                         errorJSON(w, http.StatusBadRequest, "markdown text or file is required")
                         return
                 }
+	if !checkFileSize(w, r, hdr) {
+		return
+	}
 
                 jobID, dir, err := newJobDir()
                 if err != nil {

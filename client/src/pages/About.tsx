@@ -18,7 +18,7 @@ const features = [
 ];
 
 const stats = [
-  { value: "15+", label: "PDF Tools" },
+  { value: "50+", label: "PDF Tools" },
   { value: "100%", label: "Free to Start" },
   { value: "256-bit", label: "SSL Encryption" },
   { value: "24/7", label: "Available" },

@@ -23,13 +23,13 @@ async function checkUserActive(userId: string): Promise<{ isActive: boolean; pla
 
 const LIMITS = {
   anonymous: {
-    maxOpsPerDay: 8,
-    maxFileSizeMB: 5,
+    maxOpsPerDay: 10,
+    maxFileSizeMB: 7,
     maxPages: 25,
   },
   free: {
-    maxOpsPerDay: 15,
-    maxFileSizeMB: 10,
+    maxOpsPerDay: 25,
+    maxFileSizeMB: 11,
     maxPages: 40,
   },
   pro: {
@@ -163,25 +163,6 @@ export async function checkPdfLimits(req: PdfLimitsRequest, res: Response, next:
     }
     
     const limits = LIMITS[userPlan];
-    
-    const contentLength = parseInt(req.headers["content-length"] || "0", 10);
-    const maxBytes = limits.maxFileSizeMB * 1024 * 1024;
-    
-    if (contentLength > maxBytes) {
-      if (userPlan === "anonymous") {
-        return res.status(401).json({ 
-          error: "Please log in to increase your limits",
-          reason: "file_size_exceeded",
-          limit: `${limits.maxFileSizeMB}MB`
-        });
-      } else {
-        return res.status(429).json({ 
-          error: "Daily limit reached. Upgrade to Pro for higher limits.",
-          reason: "file_size_exceeded",
-          limit: `${limits.maxFileSizeMB}MB`
-        });
-      }
-    }
     
     const dailyCount = await getDailyUsageCount(userId, clientIp);
     

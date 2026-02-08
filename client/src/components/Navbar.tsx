@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Menu, X, User, LogOut, Settings, Shield, LayoutDashboard } from "lucide-react";
+import { Menu, X, User, LogOut, Settings, Shield, LayoutDashboard, Clock, BookOpen } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
@@ -82,6 +82,14 @@ export function Navbar() {
                         Admin Dashboard
                       </DropdownMenuItem>
                     )}
+                    <DropdownMenuItem onClick={() => setLocation("/history")} className="cursor-pointer">
+                      <Clock className="h-4 w-4 mr-2" />
+                      History
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setLocation("/blog")} className="cursor-pointer">
+                      <BookOpen className="h-4 w-4 mr-2" />
+                      Blog
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => { logout(); setLocation("/"); }} className="cursor-pointer">
                       <LogOut className="h-4 w-4 mr-2" />
@@ -146,7 +154,11 @@ export function Navbar() {
                 </Link>
               ))}
             </nav>
-            <div className="border-t border-border/50 mt-3 pt-3 flex flex-col gap-2">
+            <div className="flex items-center justify-between px-4 py-2 mt-2 border-t border-border/50">
+              <span className="text-sm text-muted-foreground">Theme</span>
+              <ThemeToggle showLabel />
+            </div>
+            <div className="border-t border-border/50 mt-1 pt-3 flex flex-col gap-2">
               {user ? (
                 <>
                   <div className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground">
@@ -157,6 +169,18 @@ export function Navbar() {
                     <Button variant="ghost" className="w-full justify-start gap-2">
                       <Settings className="h-4 w-4" />
                       Profile Settings
+                    </Button>
+                  </Link>
+                  <Link href="/history">
+                    <Button variant="ghost" className="w-full justify-start gap-2">
+                      <Clock className="h-4 w-4" />
+                      History
+                    </Button>
+                  </Link>
+                  <Link href="/blog">
+                    <Button variant="ghost" className="w-full justify-start gap-2">
+                      <BookOpen className="h-4 w-4" />
+                      Blog
                     </Button>
                   </Link>
                   {user.role === "admin" && (

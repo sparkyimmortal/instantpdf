@@ -9,6 +9,7 @@ import { toolCategories, toolTips, useFavorites, canAccessTool, getToolAccessLab
 import { hapticFeedback } from "@/hooks/use-haptic";
 import { useLazyLoad } from "@/hooks/use-lazy-load";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 function ToolCard({ tool, isFavorite, onToggleFavorite, index, userPlan, compact = false }: { 
   tool: Tool; 
@@ -18,10 +19,14 @@ function ToolCard({ tool, isFavorite, onToggleFavorite, index, userPlan, compact
   userPlan: PlanLevel;
   compact?: boolean;
 }) {
+  const { t } = useLanguage();
   const tip = toolTips[tool.href];
   const { ref, isVisible } = useLazyLoad();
   const hasAccess = canAccessTool(tool, userPlan);
   const accessLabel = getToolAccessLabel(tool);
+  const toolSlug = tool.href.slice(1);
+  const translatedTitle = t(`tool.${toolSlug}` as any) || tool.title;
+  const translatedDesc = t(`toolDesc.${toolSlug}` as any) || tool.description;
   
   return (
     <motion.div
@@ -77,10 +82,10 @@ function ToolCard({ tool, isFavorite, onToggleFavorite, index, userPlan, compact
               <h3 className={`mb-0.5 sm:mb-2 text-sm sm:text-xl font-bold font-display tracking-tight transition-colors leading-tight ${
                 hasAccess ? "group-hover:text-cyan-600 dark:group-hover:text-cyan-400" : "group-hover:text-amber-600 dark:group-hover:text-amber-400"
               }`}>
-                {tool.title}
+                {translatedTitle}
               </h3>
               <p className="text-[11px] sm:text-sm text-muted-foreground leading-snug sm:leading-relaxed flex-1 hidden sm:block">
-                {tool.description}
+                {translatedDesc}
               </p>
               <div className={`absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r ${
                 hasAccess ? "from-cyan-500 to-blue-500" : "from-amber-500 to-orange-500"
@@ -90,7 +95,7 @@ function ToolCard({ tool, isFavorite, onToggleFavorite, index, userPlan, compact
         </TooltipTrigger>
         {tip && (
           <TooltipContent side="bottom" className="max-w-xs">
-            <p>{tip}</p>
+            <p>{translatedDesc}</p>
           </TooltipContent>
         )}
       </Tooltip>
@@ -98,14 +103,14 @@ function ToolCard({ tool, isFavorite, onToggleFavorite, index, userPlan, compact
   );
 }
 
-const categoryFilters = [
-  { id: "all", label: "All Tools" },
-  { id: "organize", label: "Organize" },
-  { id: "edit", label: "Edit" },
-  { id: "convert-to", label: "Convert to PDF" },
-  { id: "convert-from", label: "Convert from PDF" },
-  { id: "security", label: "Security" },
-  { id: "optimize", label: "Optimize" },
+const categoryFilterKeys = [
+  { id: "all", key: "filter.all" as const },
+  { id: "organize", key: "filter.organize" as const },
+  { id: "edit", key: "filter.edit" as const },
+  { id: "convert-to", key: "filter.convertTo" as const },
+  { id: "convert-from", key: "filter.convertFrom" as const },
+  { id: "security", key: "filter.security" as const },
+  { id: "optimize", key: "filter.optimize" as const },
 ];
 
 const categoryMapping: Record<string, string> = {
@@ -117,12 +122,23 @@ const categoryMapping: Record<string, string> = {
   "PDF Security": "security",
 };
 
+const categoryNameKeys: Record<string, string> = {
+  "Organize PDF": "cat.organizePdf",
+  "Optimize PDF": "cat.optimizePdf",
+  "Convert to PDF": "cat.convertToPdf",
+  "Convert from PDF": "cat.convertFromPdf",
+  "Edit PDF": "cat.editPdf",
+  "PDF Security": "cat.pdfSecurity",
+  "PDF Utilities": "cat.pdfUtilities",
+};
+
 export function ToolGrid() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [collapsedCategories, setCollapsedCategories] = useState<string[]>([]);
   const { favorites, toggleFavorite, isFavorite } = useFavorites();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const userPlan: PlanLevel = user?.plan === "pro" ? "pro" : user ? "free" : "anonymous";
 
   useEffect(() => {
@@ -193,13 +209,13 @@ export function ToolGrid() {
             viewport={{ once: true }}
             className="inline-block rounded-full bg-cyan-500/10 px-4 py-1.5 text-sm text-cyan-600 dark:text-cyan-400 font-medium border border-cyan-500/20"
           >
-            Complete PDF Solution
+            {t("tools.sectionBadge")}
           </motion.div>
           <h2 className="text-2xl sm:text-3xl font-display font-bold tracking-tighter md:text-4xl text-foreground">
-            All the tools you need
+            {t("tools.sectionTitle")}
           </h2>
           <p className="max-w-[700px] text-muted-foreground text-base sm:text-lg md:text-xl px-4">
-            Edit, convert, and manage your PDFs with our comprehensive suite of free tools.
+            {t("tools.sectionDesc")}
           </p>
           
           <div className="relative w-full max-w-md mt-4">
@@ -207,7 +223,7 @@ export function ToolGrid() {
             <Input
               id="tool-search"
               type="text"
-              placeholder="Search tools... (Ctrl+K)"
+              placeholder={t("tools.searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 pr-4 py-3 bg-muted/50 border-border/50 focus:border-cyan-500/50 focus:ring-cyan-500/20"
@@ -225,7 +241,7 @@ export function ToolGrid() {
           </div>
           
           <div className="flex flex-wrap justify-center gap-2 mt-6 pb-2">
-            {categoryFilters.map((filter) => (
+            {categoryFilterKeys.map((filter) => (
               <button
                 key={filter.id}
                 onClick={() => setSelectedCategory(filter.id)}
@@ -236,7 +252,7 @@ export function ToolGrid() {
                 }`}
                 data-testid={`filter-${filter.id}`}
               >
-                {filter.label}
+                {t(filter.key)}
               </button>
             ))}
           </div>
@@ -254,7 +270,7 @@ export function ToolGrid() {
                   <h3 className="text-xl sm:text-2xl font-display font-bold text-foreground/90 border-b border-border/50 pb-2 flex items-center gap-2 flex-1">
                     <span className="w-1 h-6 bg-gradient-to-b from-yellow-400 to-orange-500 rounded-full" />
                     <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
-                    Favorites
+                    {t("tools.favorites")}
                   </h3>
                 </div>
                 <div className="grid grid-cols-2 gap-2.5 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -291,7 +307,7 @@ export function ToolGrid() {
                 >
                   <h3 className="text-xl sm:text-2xl font-display font-bold text-foreground/90 border-b border-border/50 pb-2 flex items-center gap-2">
                     <span className="w-1 h-6 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full" />
-                    {category.name}
+                    {t((categoryNameKeys[category.name] || category.name) as any) || category.name}
                     <span className="text-sm font-normal text-muted-foreground ml-2">
                       ({category.tools.length})
                     </span>
@@ -338,14 +354,14 @@ export function ToolGrid() {
               className="text-center py-12"
             >
               <p className="text-muted-foreground text-lg">
-                No tools found for "{searchQuery}"
+                {t("tools.noResults")} "{searchQuery}"
               </p>
               <button
                 onClick={() => setSearchQuery("")}
                 className="mt-4 text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 dark:hover:text-cyan-300 transition-colors"
                 data-testid="button-clear-search-results"
               >
-                Clear search
+                {t("tools.clearSearch")}
               </button>
             </motion.div>
           )}

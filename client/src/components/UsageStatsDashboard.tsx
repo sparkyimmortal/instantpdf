@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useUsageStats } from "@/hooks/use-usage-stats";
 import { formatDistanceToNow } from "date-fns";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -18,6 +19,7 @@ function formatBytes(bytes: number): string {
 
 export function UsageStatsDashboard() {
   const { stats, resetStats } = useUsageStats();
+  const { t } = useLanguage();
 
   if (stats.totalOperations === 0) return null;
 
@@ -31,45 +33,45 @@ export function UsageStatsDashboard() {
 
   const statCards = [
     {
-      label: "Total Operations",
+      label: t("stats.totalOps"),
       value: stats.totalOperations.toString(),
       icon: BarChart3,
       color: "from-cyan-500 to-blue-500",
       bgColor: "bg-cyan-500/10",
     },
     {
-      label: "Files Processed",
+      label: t("stats.filesProcessed"),
       value: stats.totalFilesProcessed.toString(),
       icon: FileText,
       color: "from-violet-500 to-purple-500",
       bgColor: "bg-violet-500/10",
     },
     {
-      label: "Data Processed",
+      label: t("stats.dataProcessed"),
       value: formatBytes(stats.totalDataProcessed),
       icon: HardDrive,
       color: "from-orange-500 to-red-500",
       bgColor: "bg-orange-500/10",
     },
     {
-      label: "Success Rate",
+      label: t("stats.successRate"),
       value: `${successRate}%`,
       icon: TrendingUp,
       color: "from-green-500 to-emerald-500",
       bgColor: "bg-green-500/10",
     },
     {
-      label: "Day Streak",
+      label: t("stats.dayStreak"),
       value: stats.streakDays.toString(),
       icon: Flame,
       color: "from-amber-500 to-orange-500",
       bgColor: "bg-amber-500/10",
     },
     {
-      label: "Member Since",
+      label: t("stats.memberSince"),
       value: stats.firstUsed
         ? formatDistanceToNow(stats.firstUsed, { addSuffix: false })
-        : "Today",
+        : t("stats.today"),
       icon: Calendar,
       color: "from-pink-500 to-rose-500",
       bgColor: "bg-pink-500/10",
@@ -82,7 +84,7 @@ export function UsageStatsDashboard() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-cyan-500" />
-            <h2 className="text-xl font-display font-bold">Your Stats</h2>
+            <h2 className="text-xl font-display font-bold">{t("section.yourStats")}</h2>
           </div>
           <Button
             variant="ghost"
@@ -92,7 +94,7 @@ export function UsageStatsDashboard() {
             data-testid="button-reset-stats"
           >
             <RotateCcw className="h-3 w-3 mr-1" />
-            Reset
+            {t("stats.reset")}
           </Button>
         </div>
 
@@ -126,7 +128,7 @@ export function UsageStatsDashboard() {
             className="mt-4"
           >
             <Card className="p-4">
-              <h3 className="text-sm font-semibold mb-3 text-muted-foreground">Most Used Tools</h3>
+              <h3 className="text-sm font-semibold mb-3 text-muted-foreground">{t("stats.mostUsed")}</h3>
               <div className="space-y-2">
                 {topTools.map(([toolId, count], i) => {
                   const maxCount = topTools[0][1] as number;
@@ -134,7 +136,7 @@ export function UsageStatsDashboard() {
                   return (
                     <div key={toolId} className="flex items-center gap-3" data-testid={`top-tool-${i}`}>
                       <span className="text-sm font-medium w-32 truncate capitalize">
-                        {toolId.replace(/-/g, " ")}
+                        {t(`tool.${toolId}` as any) || toolId.replace(/-/g, " ")}
                       </span>
                       <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                         <motion.div
@@ -161,7 +163,7 @@ export function UsageStatsDashboard() {
             </div>
             <div>
               <div className="text-lg font-bold">{stats.successfulOperations}</div>
-              <div className="text-xs text-muted-foreground">Successful</div>
+              <div className="text-xs text-muted-foreground">{t("stats.successful")}</div>
             </div>
           </Card>
           <Card className="p-4 flex items-center gap-3">
@@ -170,7 +172,7 @@ export function UsageStatsDashboard() {
             </div>
             <div>
               <div className="text-lg font-bold">{stats.failedOperations}</div>
-              <div className="text-xs text-muted-foreground">Failed</div>
+              <div className="text-xs text-muted-foreground">{t("stats.failed")}</div>
             </div>
           </Card>
         </div>

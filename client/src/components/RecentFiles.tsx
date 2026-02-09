@@ -5,9 +5,11 @@ import { Clock, X, Trash2, FileText, ExternalLink } from "lucide-react";
 import { Link } from "wouter";
 import { useRecentFiles, RecentFile } from "@/hooks/use-recent-files";
 import { formatDistanceToNow } from "date-fns";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export function RecentFiles() {
   const { recentFiles, clearRecentFiles, removeRecentFile } = useRecentFiles();
+  const { t } = useLanguage();
 
   if (recentFiles.length === 0) return null;
 
@@ -17,7 +19,7 @@ export function RecentFiles() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <Clock className="h-5 w-5 text-muted-foreground" />
-            <h2 className="text-xl font-display font-bold">Recent Files</h2>
+            <h2 className="text-xl font-display font-bold">{t("section.recentFiles")}</h2>
             <span className="text-sm text-muted-foreground">({recentFiles.length})</span>
           </div>
           <Button
@@ -28,7 +30,7 @@ export function RecentFiles() {
             data-testid="button-clear-recent"
           >
             <Trash2 className="h-4 w-4 mr-2" />
-            Clear All
+            {t("section.clearAll")}
           </Button>
         </div>
 

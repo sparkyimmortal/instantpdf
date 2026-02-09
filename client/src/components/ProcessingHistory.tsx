@@ -5,9 +5,11 @@ import { Clock, Trash2, FileText, CheckCircle2, XCircle, ArrowRight, X } from "l
 import { Link } from "wouter";
 import { useProcessingHistory, type ProcessingHistoryItem } from "@/hooks/use-processing-history";
 import { formatDistanceToNow } from "date-fns";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export function ProcessingHistory() {
   const { history, clearHistory, removeFromHistory } = useProcessingHistory();
+  const { t } = useLanguage();
 
   if (history.length === 0) return null;
 
@@ -17,7 +19,7 @@ export function ProcessingHistory() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <Clock className="h-5 w-5 text-muted-foreground" />
-            <h2 className="text-xl font-display font-bold">Processing History</h2>
+            <h2 className="text-xl font-display font-bold">{t("section.processingHistory")}</h2>
             <span className="text-sm text-muted-foreground">({history.length})</span>
           </div>
           <Button
@@ -28,7 +30,7 @@ export function ProcessingHistory() {
             data-testid="button-clear-history"
           >
             <Trash2 className="h-4 w-4 mr-2" />
-            Clear All
+            {t("section.clearAll")}
           </Button>
         </div>
 

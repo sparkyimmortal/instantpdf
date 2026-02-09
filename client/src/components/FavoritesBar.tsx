@@ -4,9 +4,11 @@ import { Star } from "lucide-react";
 import { Link } from "wouter";
 import { useFavorites, type Tool } from "@/hooks/use-tools";
 import { hapticFeedback } from "@/hooks/use-haptic";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export function FavoritesBar() {
   const { getFavoriteTools } = useFavorites();
+  const { t } = useLanguage();
   const favoriteTools = getFavoriteTools();
 
   if (favoriteTools.length === 0) return null;
@@ -16,7 +18,7 @@ export function FavoritesBar() {
       <div className="container px-4 md:px-6">
         <div className="flex items-center gap-2 mb-4">
           <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-          <h2 className="text-lg font-display font-bold">Your Favorites</h2>
+          <h2 className="text-lg font-display font-bold">{t("section.favorites")}</h2>
         </div>
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1">
           <AnimatePresence>
@@ -37,7 +39,7 @@ export function FavoritesBar() {
                     <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${tool.color} flex-shrink-0`}>
                       <tool.icon className="h-4 w-4" />
                     </div>
-                    <span className="text-sm font-medium whitespace-nowrap">{tool.title}</span>
+                    <span className="text-sm font-medium whitespace-nowrap">{t(`tool.${tool.href.slice(1)}` as any) || tool.title}</span>
                   </Card>
                 </Link>
               </motion.div>

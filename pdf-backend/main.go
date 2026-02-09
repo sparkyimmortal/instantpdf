@@ -353,9 +353,9 @@ func handleDocumentCrop(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "image is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -419,9 +419,9 @@ func handleDocumentDetect(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "image is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         file, err := header.Open()
         if err != nil {
@@ -510,12 +510,12 @@ func detectDocumentBounds(src image.Image) (bool, float64, float64, float64, flo
         bestX, bestY, bestW, bestH := docFindLargestComponent(closed, sw, sh)
 
         detectedArea := float64(bestW*bestH) / float64(sw*sh)
-        if detectedArea < 0.05 {
+        if detectedArea < 0.04 {
                 bestX, bestY, bestW, bestH = docFindByEdgeProjection(edgeMag, sw, sh)
                 detectedArea = float64(bestW*bestH) / float64(sw*sh)
         }
 
-        if detectedArea < 0.08 || detectedArea > 0.85 || bestW < 10 || bestH < 10 {
+        if detectedArea < 0.04 || detectedArea > 0.96 || bestW < 10 || bestH < 10 {
                 return false, 0, 0, 0, 0
         }
 
@@ -585,7 +585,7 @@ func detectAndCropDocument(src image.Image) image.Image {
         bestX, bestY, bestW, bestH := docFindLargestComponent(closed, sw, sh)
 
         detectedArea := float64(bestW*bestH) / float64(sw*sh)
-        if detectedArea < 0.05 {
+        if detectedArea < 0.04 {
                 bestX, bestY, bestW, bestH = docFindByEdgeProjection(edgeMag, sw, sh)
                 detectedArea = float64(bestW*bestH) / float64(sw*sh)
         }
@@ -894,9 +894,9 @@ func handleRotate(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         degrees := parseIntDefault(r.FormValue("degrees"), 90)
         if degrees != 90 && degrees != 180 && degrees != 270 {
@@ -943,9 +943,9 @@ func handleCrop(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         desc := strings.TrimSpace(r.FormValue("description"))
         unit := strings.TrimSpace(r.FormValue("unit"))
@@ -1011,9 +1011,9 @@ func handlePageNumbers(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         pos := strings.TrimSpace(r.FormValue("position"))
         if pos == "" {
@@ -1160,9 +1160,9 @@ func handleWatermark(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         text := strings.TrimSpace(r.FormValue("text"))
         if text == "" {
@@ -1270,9 +1270,9 @@ func handleHeaderFooter(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         headerText := strings.TrimSpace(r.FormValue("headerText"))
         footerText := strings.TrimSpace(r.FormValue("footerText"))
@@ -1412,9 +1412,9 @@ func handleOrganize(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         order := strings.TrimSpace(r.FormValue("order"))
         if order == "" {
@@ -1684,7 +1684,7 @@ func handleMerge(w http.ResponseWriter, r *http.Request) {
                 return
         }
 
-        if err := r.ParseMultipartForm(64 << 20); err != nil { // 64MB
+        if err := r.ParseMultipartForm(256 << 20); err != nil { // 256MB
                 errorJSON(w, http.StatusBadRequest, "invalid multipart form")
                 return
         }
@@ -1694,9 +1694,9 @@ func handleMerge(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "no files provided")
                 return
         }
-	if !checkMultipleFileSizes(w, r, files) {
-		return
-	}
+        if !checkMultipleFileSizes(w, r, files) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -1747,9 +1747,9 @@ func handleSplit(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
         file.Close()
 
         jobID, dir, err := newJobDir()
@@ -1768,6 +1768,13 @@ func handleSplit(w http.ResponseWriter, r *http.Request) {
         mode := r.FormValue("mode")
         ranges := r.FormValue("ranges")
         merge := r.FormValue("merge") == "true"
+
+        // Handle mobile app "pages" field - treat as extract_merge
+        pages := r.FormValue("pages")
+        if pages != "" && mode == "" {
+                mode = "extract_merge"
+                ranges = pages
+        }
 
         // Mode: fixed_parts - split into N equal parts
         if mode == "fixed_parts" && ranges != "" {
@@ -1953,9 +1960,9 @@ func handleRemovePages(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -2003,9 +2010,9 @@ func handleExtractPages(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -2074,9 +2081,9 @@ func handleCompress(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -2201,9 +2208,9 @@ func handleRepair(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -2246,9 +2253,9 @@ func handleOCR(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -2266,19 +2273,53 @@ func handleOCR(w http.ResponseWriter, r *http.Request) {
         outPath := filepath.Join(dir, outName)
 
         lang := r.FormValue("lang")
-        args := []string{"--skip-text"}
+        args := []string{"--force-ocr", "--optimize", "1", "--output-type", "pdf"}
         if lang != "" {
                 args = append(args, "-l", lang)
         }
         args = append(args, inPath, outPath)
 
         if err := runCommand(dir, "ocrmypdf", args...); err != nil {
-                log.Printf("ocr error: %v", err)
-                errorJSON(w, http.StatusInternalServerError, "failed to OCR PDF")
-                return
+                log.Printf("ocr error with --force-ocr: %v, trying --skip-text", err)
+                args2 := []string{"--skip-text", "--optimize", "1", "--output-type", "pdf"}
+                if lang != "" {
+                        args2 = append(args2, "-l", lang)
+                }
+                args2 = append(args2, inPath, outPath)
+                if err2 := runCommand(dir, "ocrmypdf", args2...); err2 != nil {
+                        log.Printf("ocr error with --skip-text: %v", err2)
+                        errorJSON(w, http.StatusInternalServerError, "failed to OCR PDF")
+                        return
+                }
         }
 
         writeJSON(w, http.StatusOK, downloadResponse{DownloadURL: buildDownloadURL(r, jobID, outName)})
+}
+
+func convertToJPEG(dir string, imgPath string, index int) (string, error) {
+        ext := strings.ToLower(filepath.Ext(imgPath))
+        if ext == ".heic" || ext == ".heif" || ext == ".webp" || ext == ".bmp" || ext == ".tiff" || ext == ".tif" {
+                jpgPath := filepath.Join(dir, fmt.Sprintf("converted_%d.jpg", index))
+                args := []string{imgPath, "-quality", "95", jpgPath}
+                if err := runCommand(dir, "convert", args...); err != nil {
+                        return "", fmt.Errorf("failed to convert %s: %v", ext, err)
+                }
+                return jpgPath, nil
+        }
+        return imgPath, nil
+}
+
+func getPageDimensions(pageSize string) (float64, float64) {
+        switch strings.ToUpper(pageSize) {
+        case "LETTER":
+                return 612.0, 792.0
+        case "A3":
+                return 841.89, 1190.55
+        case "LEGAL":
+                return 612.0, 1008.0
+        default:
+                return 595.28, 841.89
+        }
 }
 
 func handleImageToPDF(w http.ResponseWriter, r *http.Request) {
@@ -2296,14 +2337,24 @@ func handleImageToPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "no files provided")
                 return
         }
-	if !checkMultipleFileSizes(w, r, files) {
-		return
-	}
+        if !checkMultipleFileSizes(w, r, files) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
                 errorJSON(w, http.StatusInternalServerError, "failed to create job")
                 return
+        }
+
+        layout := r.FormValue("layout")
+        pageSize := r.FormValue("pageSize")
+        marginStr := r.FormValue("margin")
+        margin := 10.0
+        if marginStr != "" {
+                if m, err := strconv.ParseFloat(marginStr, 64); err == nil {
+                        margin = m
+                }
         }
 
         var imagePaths []string
@@ -2313,7 +2364,12 @@ func handleImageToPDF(w http.ResponseWriter, r *http.Request) {
                         errorJSON(w, http.StatusInternalServerError, "failed to save image")
                         return
                 }
-                imagePaths = append(imagePaths, inPath)
+                converted, cerr := convertToJPEG(dir, inPath, i)
+                if cerr != nil {
+                        log.Printf("image convert warning: %v, using original", cerr)
+                        converted = inPath
+                }
+                imagePaths = append(imagePaths, converted)
         }
 
         outName := r.FormValue("outputFilename")
@@ -2322,58 +2378,146 @@ func handleImageToPDF(w http.ResponseWriter, r *http.Request) {
         }
         outPath := filepath.Join(dir, outName)
 
-        pdf := gofpdf.New("P", "pt", "A4", "")
+        pageW, pageH := getPageDimensions(pageSize)
+        marginPt := margin * 2.83465
+
+        pdf := gofpdf.New("P", "pt", pageSize, "")
+        if pageSize == "" || strings.ToUpper(pageSize) == "A4" {
+                pdf = gofpdf.New("P", "pt", "A4", "")
+        }
         pdf.SetMargins(0, 0, 0)
         pdf.SetAutoPageBreak(false, 0)
 
-        for _, imgPath := range imagePaths {
-                f, err := os.Open(imgPath)
-                if err != nil {
-                        log.Printf("image to pdf: failed to open %s: %v", imgPath, err)
-                        errorJSON(w, http.StatusInternalServerError, "failed to convert images")
-                        return
-                }
-                imgConfig, _, err := image.DecodeConfig(f)
-                f.Close()
-                if err != nil {
-                        log.Printf("image to pdf: failed to decode config %s: %v", imgPath, err)
-                        errorJSON(w, http.StatusInternalServerError, "failed to convert images")
-                        return
-                }
+        imagesPerPage := 1
+        switch layout {
+        case "2-up":
+                imagesPerPage = 2
+        case "grid-2x2":
+                imagesPerPage = 4
+        case "grid-3x3":
+                imagesPerPage = 9
+        default:
+                imagesPerPage = 1
+        }
 
-                imgW := float64(imgConfig.Width)
-                imgH := float64(imgConfig.Height)
-
-                pageW := 595.28
-                pageH := 841.89
-
-                scaleW := pageW / imgW
-                scaleH := pageH / imgH
-                scale := scaleW
-                if scaleH < scaleW {
-                        scale = scaleH
-                }
-
-                drawW := imgW * scale
-                drawH := imgH * scale
-                x := (pageW - drawW) / 2
-                y := (pageH - drawH) / 2
-
-                pdf.AddPage()
-
-                ext := strings.ToLower(filepath.Ext(imgPath))
-                var imgType string
-                switch ext {
-                case ".png":
-                        imgType = "PNG"
-                case ".gif":
-                        imgType = "GIF"
-                default:
-                        imgType = "JPEG"
+        if layout != "" && layout != "full" && imagesPerPage > 1 {
+                cols := 1
+                rows := 1
+                switch layout {
+                case "2-up":
+                        cols = 1
+                        rows = 2
+                case "grid-2x2":
+                        cols = 2
+                        rows = 2
+                case "grid-3x3":
+                        cols = 3
+                        rows = 3
                 }
 
-                opt := gofpdf.ImageOptions{ImageType: imgType, ReadDpi: true}
-                pdf.ImageOptions(imgPath, x, y, drawW, drawH, false, opt, 0, "")
+                usableW := pageW - marginPt*2
+                usableH := pageH - marginPt*2
+                cellW := (usableW - marginPt*float64(cols-1)) / float64(cols)
+                cellH := (usableH - marginPt*float64(rows-1)) / float64(rows)
+
+                for i := 0; i < len(imagePaths); i += imagesPerPage {
+                        pdf.AddPage()
+                        end := i + imagesPerPage
+                        if end > len(imagePaths) {
+                                end = len(imagePaths)
+                        }
+                        for j := i; j < end; j++ {
+                                slot := j - i
+                                col := slot % cols
+                                row := slot / cols
+
+                                cellX := marginPt + float64(col)*(cellW+marginPt)
+                                cellY := marginPt + float64(row)*(cellH+marginPt)
+
+                                imgPath := imagePaths[j]
+                                f, ferr := os.Open(imgPath)
+                                if ferr != nil {
+                                        log.Printf("image collage: failed to open %s: %v", imgPath, ferr)
+                                        continue
+                                }
+                                imgConfig, _, derr := image.DecodeConfig(f)
+                                f.Close()
+                                if derr != nil {
+                                        log.Printf("image collage: failed to decode %s: %v", imgPath, derr)
+                                        continue
+                                }
+
+                                imgW := float64(imgConfig.Width)
+                                imgH := float64(imgConfig.Height)
+                                scaleW := cellW / imgW
+                                scaleH := cellH / imgH
+                                scale := scaleW
+                                if scaleH < scaleW {
+                                        scale = scaleH
+                                }
+                                drawW := imgW * scale
+                                drawH := imgH * scale
+                                x := cellX + (cellW-drawW)/2
+                                y := cellY + (cellH-drawH)/2
+
+                                ext := strings.ToLower(filepath.Ext(imgPath))
+                                imgType := "JPEG"
+                                if ext == ".png" {
+                                        imgType = "PNG"
+                                } else if ext == ".gif" {
+                                        imgType = "GIF"
+                                }
+                                opt := gofpdf.ImageOptions{ImageType: imgType, ReadDpi: true}
+                                pdf.ImageOptions(imgPath, x, y, drawW, drawH, false, opt, 0, "")
+                        }
+                }
+        } else {
+                for _, imgPath := range imagePaths {
+                        f, ferr := os.Open(imgPath)
+                        if ferr != nil {
+                                log.Printf("image to pdf: failed to open %s: %v", imgPath, ferr)
+                                errorJSON(w, http.StatusInternalServerError, "failed to convert images")
+                                return
+                        }
+                        imgConfig, _, derr := image.DecodeConfig(f)
+                        f.Close()
+                        if derr != nil {
+                                log.Printf("image to pdf: failed to decode config %s: %v", imgPath, derr)
+                                errorJSON(w, http.StatusInternalServerError, "failed to convert images")
+                                return
+                        }
+
+                        imgW := float64(imgConfig.Width)
+                        imgH := float64(imgConfig.Height)
+
+                        scaleW := (pageW - marginPt*2) / imgW
+                        scaleH := (pageH - marginPt*2) / imgH
+                        scale := scaleW
+                        if scaleH < scaleW {
+                                scale = scaleH
+                        }
+
+                        drawW := imgW * scale
+                        drawH := imgH * scale
+                        x := (pageW - drawW) / 2
+                        y := (pageH - drawH) / 2
+
+                        pdf.AddPage()
+
+                        ext := strings.ToLower(filepath.Ext(imgPath))
+                        var imgType string
+                        switch ext {
+                        case ".png":
+                                imgType = "PNG"
+                        case ".gif":
+                                imgType = "GIF"
+                        default:
+                                imgType = "JPEG"
+                        }
+
+                        opt := gofpdf.ImageOptions{ImageType: imgType, ReadDpi: true}
+                        pdf.ImageOptions(imgPath, x, y, drawW, drawH, false, opt, 0, "")
+                }
         }
 
         if err := pdf.OutputFileAndClose(outPath); err != nil {
@@ -2400,9 +2544,9 @@ func handleWordToPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -2451,9 +2595,9 @@ func handlePreview(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -2677,9 +2821,9 @@ func handleProtectPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
-	if !checkFileSize(w, r, hdr) {
-		return
-	}
+        if !checkFileSize(w, r, hdr) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -2737,9 +2881,9 @@ func handleUnlockPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
-	if !checkFileSize(w, r, hdr) {
-		return
-	}
+        if !checkFileSize(w, r, hdr) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -2833,9 +2977,9 @@ func handleRedactPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
-	if !checkFileSize(w, r, hdr) {
-		return
-	}
+        if !checkFileSize(w, r, hdr) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -2995,9 +3139,9 @@ func handleFlattenPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
-	if !checkFileSize(w, r, hdr) {
-		return
-	}
+        if !checkFileSize(w, r, hdr) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -3058,9 +3202,9 @@ func handlePDFToWord(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
-	if !checkFileSize(w, r, hdr) {
-		return
-	}
+        if !checkFileSize(w, r, hdr) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -3172,9 +3316,9 @@ func handlePDFToExcel(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
-	if !checkFileSize(w, r, hdr) {
-		return
-	}
+        if !checkFileSize(w, r, hdr) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -3297,9 +3441,9 @@ func handlePDFToPowerPoint(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
-	if !checkFileSize(w, r, hdr) {
-		return
-	}
+        if !checkFileSize(w, r, hdr) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -3393,9 +3537,9 @@ func handleExcelToPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
-	if !checkFileSize(w, r, hdr) {
-		return
-	}
+        if !checkFileSize(w, r, hdr) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -3464,9 +3608,9 @@ func handlePowerPointToPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
-	if !checkFileSize(w, r, hdr) {
-		return
-	}
+        if !checkFileSize(w, r, hdr) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -3537,9 +3681,9 @@ func handlePDFToJPG(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
-	if !checkFileSize(w, r, hdr) {
-		return
-	}
+        if !checkFileSize(w, r, hdr) {
+                return
+        }
 
         // Optional DPI parameter (default 150)
         dpi := parseIntDefault(r.FormValue("dpi"), 150)
@@ -3666,9 +3810,9 @@ func handleExtractText(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
-	if !checkFileSize(w, r, hdr) {
-		return
-	}
+        if !checkFileSize(w, r, hdr) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -3719,9 +3863,9 @@ func handleExtractImages(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file required")
                 return
         }
-	if !checkFileSize(w, r, hdr) {
-		return
-	}
+        if !checkFileSize(w, r, hdr) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -3818,9 +3962,9 @@ func handleHTMLToPDF(w http.ResponseWriter, r *http.Request) {
                         errorJSON(w, http.StatusBadRequest, "file, html content, or url required")
                         return
                 }
-	if !checkFileSize(w, r, hdr) {
-		return
-	}
+        if !checkFileSize(w, r, hdr) {
+                return
+        }
 
                 inputPath := filepath.Join(dir, "input.html")
                 if err := saveUploadedFile(hdr, inputPath); err != nil {
@@ -3974,9 +4118,9 @@ func handleDigitalSignature(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         signature := r.FormValue("signature")
         page := parseIntDefault(r.FormValue("page"), 1)
@@ -4072,9 +4216,9 @@ func handleSignPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         signaturesJSON := r.FormValue("signatures")
         log.Printf("[sign] Received signatures JSON (length %d): %s", len(signaturesJSON), signaturesJSON)
@@ -4263,9 +4407,9 @@ func handleAddTextAnnotation(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         text := r.FormValue("text")
         if text == "" {
@@ -4449,9 +4593,9 @@ func handleValidatePDFA(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -4528,9 +4672,9 @@ func handlePDFToHTML(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -4623,9 +4767,9 @@ func handleAddHeaderFooter(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -4756,9 +4900,9 @@ func handleConvertToPDFA(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -4814,9 +4958,9 @@ func handleEditPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, header) {
-		return
-	}
+        if !checkFileSize(w, r, header) {
+                return
+        }
 
         annotationsJSON := r.FormValue("annotations")
         
@@ -5130,9 +5274,9 @@ func handlePNGToPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "no files provided")
                 return
         }
-	if !checkMultipleFileSizes(w, r, files) {
-		return
-	}
+        if !checkMultipleFileSizes(w, r, files) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -5178,9 +5322,9 @@ func handlePDFToPNG(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, hdr) {
-		return
-	}
+        if !checkFileSize(w, r, hdr) {
+                return
+        }
 
         dpi := parseIntDefault(r.FormValue("dpi"), 300)
         if dpi < 72 {
@@ -5254,9 +5398,9 @@ func handlePDFToTIFF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, hdr) {
-		return
-	}
+        if !checkFileSize(w, r, hdr) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -5311,9 +5455,9 @@ func handleBMPToPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "no files provided")
                 return
         }
-	if !checkMultipleFileSizes(w, r, files) {
-		return
-	}
+        if !checkMultipleFileSizes(w, r, files) {
+                return
+        }
 
         jobID, dir, err := newJobDir()
         if err != nil {
@@ -5366,9 +5510,9 @@ func handleEncryptPDF(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, hdr) {
-		return
-	}
+        if !checkFileSize(w, r, hdr) {
+                return
+        }
 
         permissions := strings.TrimSpace(r.FormValue("permissions"))
 
@@ -5435,9 +5579,9 @@ func handleMetadataEditor(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, hdr) {
-		return
-	}
+        if !checkFileSize(w, r, hdr) {
+                return
+        }
 
         action := strings.TrimSpace(r.FormValue("action"))
         if action == "" {
@@ -5555,9 +5699,9 @@ func handleBookmarksEditor(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, hdr) {
-		return
-	}
+        if !checkFileSize(w, r, hdr) {
+                return
+        }
 
         bookmarksJSON := strings.TrimSpace(r.FormValue("bookmarks"))
         if bookmarksJSON == "" {
@@ -5665,9 +5809,9 @@ func handleBatchProcess(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "no files provided")
                 return
         }
-	if !checkMultipleFileSizes(w, r, files) {
-		return
-	}
+        if !checkMultipleFileSizes(w, r, files) {
+                return
+        }
 
         operation := strings.TrimSpace(r.FormValue("operation"))
         if operation == "" {
@@ -5813,9 +5957,9 @@ func handleFormFill(w http.ResponseWriter, r *http.Request) {
                 errorJSON(w, http.StatusBadRequest, "file is required")
                 return
         }
-	if !checkFileSize(w, r, hdr) {
-		return
-	}
+        if !checkFileSize(w, r, hdr) {
+                return
+        }
 
         action := strings.TrimSpace(r.FormValue("action"))
         if action == "" {
@@ -5964,9 +6108,9 @@ func handleMarkdownToPDF(w http.ResponseWriter, r *http.Request) {
                         errorJSON(w, http.StatusBadRequest, "markdown text or file is required")
                         return
                 }
-	if !checkFileSize(w, r, hdr) {
-		return
-	}
+        if !checkFileSize(w, r, hdr) {
+                return
+        }
 
                 jobID, dir, err := newJobDir()
                 if err != nil {

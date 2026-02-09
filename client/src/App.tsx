@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { LanguageProvider } from "@/contexts/LanguageContext";
 import { useLocation } from "wouter";
 import { useState, useEffect, lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -76,6 +77,7 @@ const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const History = lazy(() => import("@/pages/History"));
 const AdminDashboard = lazy(() => import("@/pages/AdminDashboard"));
+const SharePage = lazy(() => import("@/pages/SharePage"));
 
 const pageVariants = {
   initial: { opacity: 0, y: 8 },
@@ -203,6 +205,7 @@ function Router() {
               <Route path="/history" component={History} />
               <Route path="/pricing" component={Pricing} />
               <Route path="/admin" component={AdminDashboard} />
+              <Route path="/share/:token" component={SharePage} />
 
               <Route component={NotFound} />
             </Switch>
@@ -218,20 +221,22 @@ function App() {
 
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            {!splashDone && <SplashScreen onComplete={() => setSplashDone(true)} />}
-            <OfflineBanner />
-            <Toaster />
-            <ScrollToTop />
-            <ToolUsageTracker />
-            <Router />
-            <BottomNav />
-            <PWAInstallPrompt />
-          </TooltipProvider>
-        </QueryClientProvider>
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+              {!splashDone && <SplashScreen onComplete={() => setSplashDone(true)} />}
+              <OfflineBanner />
+              <Toaster />
+              <ScrollToTop />
+              <ToolUsageTracker />
+              <Router />
+              <BottomNav />
+              <PWAInstallPrompt />
+            </TooltipProvider>
+          </QueryClientProvider>
+        </AuthProvider>
+      </LanguageProvider>
     </ThemeProvider>
   );
 }

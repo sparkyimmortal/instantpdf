@@ -13,44 +13,46 @@ import { Link } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useState, useCallback } from "react";
-
-const stats = [
-  { value: "50+", label: "PDF Tools", icon: FileText },
-  { value: "100%", label: "Private & Secure", icon: Shield },
-  { value: "<2s", label: "Processing Time", icon: Clock },
-  { value: "0", label: "Files Stored", icon: Globe },
-];
-
-const highlights = [
-  {
-    title: "No Installation Required",
-    description: "Works directly in your browser. No software to download or install.",
-    icon: Globe,
-  },
-  {
-    title: "Lightning Fast",
-    description: "Powered by a dedicated Go backend for instant processing of even large files.",
-    icon: Zap,
-  },
-  {
-    title: "Privacy First",
-    description: "Files processed in-memory and deleted immediately. We never store your documents.",
-    icon: Shield,
-  },
-  {
-    title: "Mobile Ready",
-    description: "Use on any device. Plus our Android app with document scanner and QR tools.",
-    icon: Users,
-  },
-];
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function Home() {
   const [refreshKey, setRefreshKey] = useState(0);
+  const { t } = useLanguage();
 
   const handleRefresh = useCallback(async () => {
     await new Promise((resolve) => setTimeout(resolve, 500));
     setRefreshKey((k) => k + 1);
   }, []);
+
+  const stats = [
+    { value: "50+", label: t("hero.stats.tools"), icon: FileText },
+    { value: "100%", label: t("hero.stats.secure"), icon: Shield },
+    { value: "<2s", label: t("hero.stats.fast"), icon: Clock },
+    { value: "0", label: t("hero.stats.stored"), icon: Globe },
+  ];
+
+  const highlights = [
+    {
+      title: t("highlight.noInstall"),
+      description: t("highlight.noInstallDesc"),
+      icon: Globe,
+    },
+    {
+      title: t("highlight.fast"),
+      description: t("highlight.fastDesc"),
+      icon: Zap,
+    },
+    {
+      title: t("highlight.privacy"),
+      description: t("highlight.privacyDesc"),
+      icon: Shield,
+    },
+    {
+      title: t("highlight.mobile"),
+      description: t("highlight.mobileDesc"),
+      icon: Users,
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-background font-sans antialiased">
@@ -106,10 +108,10 @@ export default function Home() {
           <div className="container px-4 md:px-6">
             <div className="text-center mb-12">
               <h2 className="text-3xl sm:text-4xl font-display font-bold mb-4" data-testid="text-why-title">
-                Why Choose InstantPDF?
+                {t("home.whyTitle")}
               </h2>
               <p className="text-muted-foreground max-w-lg mx-auto">
-                Built for speed, privacy, and simplicity. Here's what makes us different.
+                {t("home.whySubtitle")}
               </p>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -143,20 +145,20 @@ export default function Home() {
           <div className="container px-4 md:px-6">
             <div className="text-center mb-12">
               <h2 className="text-3xl sm:text-4xl font-display font-bold mb-4" data-testid="text-mobile-app-title">
-                Get the Mobile App
+                {t("home.mobileTitle")}
               </h2>
               <p className="text-muted-foreground max-w-lg mx-auto">
-                Take InstantPDF with you. All tools in your pocket, plus exclusive mobile features.
+                {t("home.mobileSubtitle")}
               </p>
             </div>
             <div className="grid md:grid-cols-2 gap-8 items-center max-w-4xl mx-auto">
               <div className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {[
-                    { icon: FileText, title: "50+ PDF Tools", desc: "All tools available on mobile" },
-                    { icon: Camera, title: "Document Scanner", desc: "Scan with your camera" },
-                    { icon: QrCode, title: "QR Code Generator", desc: "Create QR codes instantly" },
-                    { icon: Wifi, title: "Offline Mode", desc: "Queue tasks for later" },
+                    { icon: FileText, title: t("home.mobileTools"), desc: t("home.mobileToolsDesc") },
+                    { icon: Camera, title: t("home.scanner"), desc: t("home.scannerDesc") },
+                    { icon: QrCode, title: t("home.qrCode"), desc: t("home.qrCodeDesc") },
+                    { icon: Wifi, title: t("home.offline"), desc: t("home.offlineDesc") },
                   ].map((feature, i) => (
                     <motion.div
                       key={feature.title}
@@ -187,9 +189,9 @@ export default function Home() {
                   <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 mb-4">
                     <Smartphone className="h-8 w-8 text-white" />
                   </div>
-                  <h3 className="text-xl font-bold mb-2">InstantPDF for Android</h3>
+                  <h3 className="text-xl font-bold mb-2">{t("home.androidTitle")}</h3>
                   <p className="text-sm text-muted-foreground mb-6">
-                    Download the APK and install directly on your Android device.
+                    {t("home.androidDesc")}
                   </p>
                   <a href="/InstantPDF.apk" download>
                     <Button
@@ -198,11 +200,11 @@ export default function Home() {
                       data-testid="button-download-apk"
                     >
                       <Download className="h-5 w-5 mr-2" />
-                      Download APK
+                      {t("home.downloadApk")}
                     </Button>
                   </a>
                   <p className="text-xs text-muted-foreground mt-3">
-                    Android 8.0+ required
+                    {t("home.androidReq")}
                   </p>
                 </Card>
               </motion.div>
@@ -219,10 +221,10 @@ export default function Home() {
           <div className="container px-4 md:px-6">
             <Card className="p-8 sm:p-12 bg-gradient-to-br from-cyan-500/10 to-blue-600/10 border-cyan-500/20 text-center">
               <h2 className="text-2xl sm:text-3xl font-display font-bold mb-4" data-testid="text-cta-title">
-                Ready to simplify your PDF workflow?
+                {t("home.ctaTitle")}
               </h2>
               <p className="text-muted-foreground max-w-lg mx-auto mb-6">
-                Join thousands of users who trust InstantPDF for fast, private, and reliable PDF processing.
+                {t("home.ctaSubtitle")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link href="/pricing">
@@ -231,13 +233,13 @@ export default function Home() {
                     className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-lg shadow-cyan-500/25"
                     data-testid="button-view-pricing"
                   >
-                    View Pricing
+                    {t("home.viewPricing")}
                     <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>
                 </Link>
                 <Link href="/signup">
                   <Button size="lg" variant="outline" data-testid="button-signup-cta">
-                    Create Free Account
+                    {t("home.createAccount")}
                   </Button>
                 </Link>
               </div>
@@ -262,17 +264,17 @@ export default function Home() {
                 <span className="font-bold text-lg bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">InstantPDF</span>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                Fast, private, and reliable PDF tools. Your files are never stored on our servers.
+                {t("footer.tagline")}
               </p>
               <div className="flex items-center gap-1 text-xs text-muted-foreground/60">
-                <span>Made with</span>
+                <span>{t("footer.madeWith")}</span>
                 <Heart className="h-3 w-3 text-red-400 fill-red-400" />
-                <span>for productivity</span>
+                <span>{t("footer.forProductivity")}</span>
               </div>
             </div>
 
             <div>
-              <h4 className="font-semibold text-sm text-foreground mb-4">Popular Tools</h4>
+              <h4 className="font-semibold text-sm text-foreground mb-4">{t("footer.popularTools")}</h4>
               <ul className="space-y-2.5 text-sm text-muted-foreground">
                 <li><Link href="/merge-pdf" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Merge PDF</Link></li>
                 <li><Link href="/compress-pdf" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Compress PDF</Link></li>
@@ -283,7 +285,7 @@ export default function Home() {
             </div>
 
             <div>
-              <h4 className="font-semibold text-sm text-foreground mb-4">More Tools</h4>
+              <h4 className="font-semibold text-sm text-foreground mb-4">{t("footer.moreTools")}</h4>
               <ul className="space-y-2.5 text-sm text-muted-foreground">
                 <li><Link href="/rotate-pdf" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Rotate PDF</Link></li>
                 <li><Link href="/watermark-pdf" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Watermark PDF</Link></li>
@@ -294,24 +296,24 @@ export default function Home() {
             </div>
 
             <div>
-              <h4 className="font-semibold text-sm text-foreground mb-4">Company</h4>
+              <h4 className="font-semibold text-sm text-foreground mb-4">{t("footer.company")}</h4>
               <ul className="space-y-2.5 text-sm text-muted-foreground">
-                <li><Link href="/pricing" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-pricing">Pricing</Link></li>
-                <li><Link href="/about" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-about">About</Link></li>
-                <li><Link href="/blog" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-blog">Blog</Link></li>
-                <li><Link href="/contact" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-contact">Contact</Link></li>
-                <li><Link href="/privacy" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-privacy">Privacy Policy</Link></li>
-                <li><Link href="/terms" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-terms">Terms of Service</Link></li>
+                <li><Link href="/pricing" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-pricing">{t("footer.pricing")}</Link></li>
+                <li><Link href="/about" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-about">{t("footer.about")}</Link></li>
+                <li><Link href="/blog" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-blog">{t("footer.blog")}</Link></li>
+                <li><Link href="/contact" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-contact">{t("footer.contact")}</Link></li>
+                <li><Link href="/privacy" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-privacy">{t("footer.privacy")}</Link></li>
+                <li><Link href="/terms" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" data-testid="link-terms">{t("footer.terms")}</Link></li>
               </ul>
             </div>
           </div>
 
           <div className="border-t border-border/40 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <p className="text-xs text-muted-foreground/60">&copy; 2026 InstantPDF. All rights reserved.</p>
+            <p className="text-xs text-muted-foreground/60">{t("footer.copyright")}</p>
             <div className="flex items-center gap-4 text-xs text-muted-foreground/60">
               <Link href="/contact" className="flex items-center gap-1 hover:text-cyan-500 transition-colors">
                 <Mail className="h-3 w-3" />
-                <span>Support</span>
+                <span>{t("footer.support")}</span>
               </Link>
               <span>instantpdf.in</span>
             </div>

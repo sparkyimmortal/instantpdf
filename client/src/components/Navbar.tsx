@@ -1,24 +1,27 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Menu, X, User, LogOut, Settings, Shield, LayoutDashboard, Clock, BookOpen } from "lucide-react";
+import { Menu, X, User, LogOut, Settings, Shield, LayoutDashboard, Clock, BookOpen, Globe } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { languages } from "@/lib/i18n";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
-const navLinks = [
-  { href: "/", label: "All Tools" },
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/merge-pdf", label: "Quick Merge" },
-  { href: "/split-pdf", label: "Quick Split" },
-  { href: "/compress-pdf", label: "Quick Compress" },
+const navLinkKeys = [
+  { href: "/", key: "nav.allTools" as const },
+  { href: "/dashboard", key: "nav.dashboard" as const },
+  { href: "/merge-pdf", key: "nav.quickMerge" as const },
+  { href: "/split-pdf", key: "nav.quickSplit" as const },
+  { href: "/compress-pdf", key: "nav.quickCompress" as const },
 ];
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [location, setLocation] = useLocation();
   const { user, logout, isLoading } = useAuth();
+  const { language, setLanguage, t } = useLanguage();
 
   useEffect(() => {
     setIsOpen(false);
@@ -47,7 +50,7 @@ export function Navbar() {
           </Link>
           <div className="hidden md:flex md:flex-1 md:items-center md:space-x-4">
             <nav className="flex items-center space-x-1 text-sm font-medium text-muted-foreground">
-              {navLinks.map((link) => (
+              {navLinkKeys.map((link) => (
                 <Link 
                   key={link.href}
                   href={link.href} 
@@ -55,16 +58,35 @@ export function Navbar() {
                     location === link.href ? 'text-foreground bg-muted' : ''
                   }`}
                 >
-                  {link.label}
+                  {t(link.key)}
                 </Link>
               ))}
             </nav>
           </div>
           <div className="ml-auto flex items-center space-x-2">
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9" data-testid="button-language">
+                  <Globe className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
+                {languages.map((lang) => (
+                  <DropdownMenuItem
+                    key={lang.code}
+                    onClick={() => setLanguage(lang.code)}
+                    className={`cursor-pointer ${language === lang.code ? "bg-accent" : ""}`}
+                  >
+                    <span className="mr-2">{lang.nativeName}</span>
+                    <span className="text-xs text-muted-foreground">{lang.name}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <ThemeToggle />
             {!isLoading && (
               user ? (
-                <DropdownMenu>
+                <DropdownMenu modal={false}>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className="hidden md:flex hover:bg-muted gap-2">
                       <User className="h-4 w-4" />
@@ -74,26 +96,26 @@ export function Navbar() {
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={() => setLocation("/profile")} className="cursor-pointer">
                       <Settings className="h-4 w-4 mr-2" />
-                      Profile Settings
+                      {t("nav.profile")}
                     </DropdownMenuItem>
                     {user.role === "admin" && (
                       <DropdownMenuItem onClick={() => setLocation("/admin")} className="cursor-pointer">
                         <Shield className="h-4 w-4 mr-2" />
-                        Admin Dashboard
+                        {t("nav.admin")}
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuItem onClick={() => setLocation("/history")} className="cursor-pointer">
                       <Clock className="h-4 w-4 mr-2" />
-                      History
+                      {t("nav.history")}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setLocation("/blog")} className="cursor-pointer">
                       <BookOpen className="h-4 w-4 mr-2" />
-                      Blog
+                      {t("nav.blog")}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => { logout(); setLocation("/"); }} className="cursor-pointer">
                       <LogOut className="h-4 w-4 mr-2" />
-                      Sign out
+                      {t("nav.signout")}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -101,7 +123,7 @@ export function Navbar() {
                 <>
                   <Link href="/login">
                     <Button variant="ghost" size="sm" className="hidden md:flex hover:bg-muted">
-                      Log in
+                      {t("nav.login")}
                     </Button>
                   </Link>
                   <Link href="/signup">
@@ -109,7 +131,7 @@ export function Navbar() {
                       size="sm" 
                       className="hidden md:flex bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 border-0 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30 transition-all"
                     >
-                      Sign up
+                      {t("nav.signup")}
                     </Button>
                   </Link>
                 </>
@@ -140,7 +162,7 @@ export function Navbar() {
         <div className="fixed top-16 left-0 right-0 z-50 bg-background border-b border-border/50 shadow-xl md:hidden max-h-[calc(100vh-4rem)] overflow-y-auto">
           <div className="p-4">
             <nav className="flex flex-col space-y-1">
-              {navLinks.map((link) => (
+              {navLinkKeys.map((link) => (
                 <Link 
                   key={link.href}
                   href={link.href}
@@ -150,13 +172,31 @@ export function Navbar() {
                       : 'text-foreground hover:bg-muted'
                   }`}
                 >
-                  {link.label}
+                  {t(link.key)}
                 </Link>
               ))}
             </nav>
             <div className="flex items-center justify-between px-4 py-2 mt-2 border-t border-border/50">
-              <span className="text-sm text-muted-foreground">Theme</span>
+              <span className="text-sm text-muted-foreground">{t("nav.theme")}</span>
               <ThemeToggle showLabel />
+            </div>
+            <div className="px-4 py-2 border-t border-border/50">
+              <span className="text-sm text-muted-foreground block mb-2">{t("nav.language")}</span>
+              <div className="flex flex-wrap gap-1">
+                {languages.map((lang) => (
+                  <button
+                    key={lang.code}
+                    onClick={() => setLanguage(lang.code)}
+                    className={`px-2 py-1 text-xs rounded-md transition-colors ${
+                      language === lang.code
+                        ? "bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 font-medium"
+                        : "text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {lang.nativeName}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="border-t border-border/50 mt-1 pt-3 flex flex-col gap-2">
               {user ? (
@@ -168,26 +208,26 @@ export function Navbar() {
                   <Link href="/profile">
                     <Button variant="ghost" className="w-full justify-start gap-2">
                       <Settings className="h-4 w-4" />
-                      Profile Settings
+                      {t("nav.profile")}
                     </Button>
                   </Link>
                   <Link href="/history">
                     <Button variant="ghost" className="w-full justify-start gap-2">
                       <Clock className="h-4 w-4" />
-                      History
+                      {t("nav.history")}
                     </Button>
                   </Link>
                   <Link href="/blog">
                     <Button variant="ghost" className="w-full justify-start gap-2">
                       <BookOpen className="h-4 w-4" />
-                      Blog
+                      {t("nav.blog")}
                     </Button>
                   </Link>
                   {user.role === "admin" && (
                     <Link href="/admin">
                       <Button variant="ghost" className="w-full justify-start gap-2">
                         <Shield className="h-4 w-4" />
-                        Admin Dashboard
+                        {t("nav.admin")}
                       </Button>
                     </Link>
                   )}
@@ -197,19 +237,19 @@ export function Navbar() {
                     onClick={() => { logout(); setLocation("/"); }}
                   >
                     <LogOut className="h-4 w-4" />
-                    Sign out
+                    {t("nav.signout")}
                   </Button>
                 </>
               ) : (
                 <div className="flex gap-2">
                   <Link href="/login" className="flex-1">
                     <Button variant="outline" className="w-full">
-                      Log in
+                      {t("nav.login")}
                     </Button>
                   </Link>
                   <Link href="/signup" className="flex-1">
                     <Button className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 border-0">
-                      Sign up
+                      {t("nav.signup")}
                     </Button>
                   </Link>
                 </div>

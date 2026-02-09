@@ -3,6 +3,7 @@ import { ArrowRight, Zap, Shield, Clock, FileText, Minimize2, RefreshCw, Layers,
 import { motion } from "framer-motion";
 import { useCallback } from "react";
 import { Link } from "wouter";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const floatingParticles = Array.from({ length: 5 }, (_, i) => ({
   id: i,
@@ -23,6 +24,7 @@ const toolIcons = [
 ];
 
 export function Hero() {
+  const { t } = useLanguage();
   const scrollToTools = useCallback(() => {
     const toolsSection = document.getElementById('tools');
     if (toolsSection) {
@@ -98,7 +100,7 @@ export function Hero() {
                 >
                   <Zap className="h-3.5 w-3.5" />
                 </motion.div>
-                <span className="font-medium">Lightning fast PDF tools</span>
+                <span className="font-medium">{t("hero.badge")}</span>
               </motion.div>
 
               <motion.div
@@ -108,7 +110,7 @@ export function Hero() {
                 className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-cyan-500/15 to-blue-500/15 px-4 py-1.5 text-sm font-bold text-cyan-600 dark:text-cyan-400 border border-cyan-500/25 backdrop-blur-sm"
               >
                 <FileText className="h-3.5 w-3.5" />
-                <span>50+ PDF tools</span>
+                <span>{t("hero.toolCount")}</span>
               </motion.div>
             </div>
 
@@ -118,13 +120,13 @@ export function Hero() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="text-4xl sm:text-5xl md:text-6xl font-display font-bold tracking-tight text-foreground leading-[1.1]"
             >
-              All your PDF tools in{" "}
+              {t("hero.title")}{" "}
               <motion.span
                 className="bg-gradient-to-r from-cyan-400 via-blue-500 to-cyan-400 bg-clip-text text-transparent bg-[length:200%_auto]"
                 animate={{ backgroundPosition: ["0% center", "200% center"] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
               >
-                one place
+                {t("hero.titleHighlight")}
               </motion.span>
             </motion.h1>
 
@@ -134,7 +136,7 @@ export function Hero() {
               transition={{ duration: 0.6, delay: 0.3 }}
               className="max-w-[540px] mx-auto lg:mx-0 text-muted-foreground text-base sm:text-lg font-light leading-relaxed"
             >
-              The fastest PDF tools online. Your files are never stored — processed instantly and deleted immediately. Complete privacy guaranteed.
+              {t("hero.subtitle")}
             </motion.p>
 
             <motion.div
@@ -150,7 +152,7 @@ export function Hero() {
                   className="h-12 sm:h-13 px-8 text-base font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 shadow-lg shadow-cyan-500/25 transition-all hover:shadow-cyan-500/40 border-0 group"
                   data-testid="button-get-started"
                 >
-                  Get Started
+                  {t("hero.getStarted")}
                   <motion.div
                     className="ml-2"
                     animate={{ x: [0, 4, 0] }}
@@ -168,7 +170,7 @@ export function Hero() {
                   className="h-12 sm:h-13 px-8 text-base border-border/50 hover:bg-muted/50 hover:border-cyan-500/30 transition-all backdrop-blur-sm"
                   data-testid="button-view-tools"
                 >
-                  View All Tools
+                  {t("hero.viewAllTools")}
                 </Button>
               </motion.div>
             </motion.div>
@@ -180,9 +182,9 @@ export function Hero() {
               className="flex flex-wrap gap-2.5 justify-center lg:justify-start pt-4"
             >
               {[
-                { icon: Zap, text: "Instant Processing" },
-                { icon: Shield, text: "100% Private" },
-                { icon: Clock, text: "No Data Stored" },
+                { icon: Zap, text: t("hero.instantProcessing") },
+                { icon: Shield, text: t("hero.private") },
+                { icon: Clock, text: t("hero.noDataStored") },
               ].map((item, index) => (
                 <motion.div
                   key={item.text}

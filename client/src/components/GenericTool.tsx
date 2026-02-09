@@ -1,6 +1,6 @@
 import { useCallback, useState, useRef, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
-import { UploadCloud, File, Download, ArrowRight, Loader2, CheckCircle2, RefreshCw, Lock, Crown, type LucideIcon } from "lucide-react";
+import { UploadCloud, File, Download, ArrowRight, Loader2, CheckCircle2, RefreshCw, Lock, Crown, Share2, Copy, Check, type LucideIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ToolLayout } from "@/components/ToolLayout";
@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { PdfPreview } from "@/components/PdfPreview";
 import { pdfFetch, formatPdfError, downloadPdfFile } from "@/lib/pdfApi";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { getToolByHref, canAccessTool, type PlanLevel } from "@/hooks/use-tools";
 import { Link } from "wouter";
 import { toolPageData } from "@/lib/toolPageData";
@@ -140,6 +141,7 @@ export function GenericTool({
   const { toast } = useToast();
   const { addToHistory } = useProcessingHistory();
   const { recordOperation } = useUsageStats();
+  const { t } = useLanguage();
 
   useEffect(() => {
     return () => {
@@ -331,6 +333,39 @@ export function GenericTool({
     }
   };
 
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const handleShare = async () => {
+    if (!downloadUrl) return;
+    setShareLoading(true);
+    try {
+      const res = await fetch("/api/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          downloadUrl,
+          filename: file?.name || files[0]?.name || "processed.pdf",
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to create share link");
+      const data = await res.json();
+      setShareUrl(data.shareUrl);
+    } catch {
+      toast({ title: "Share failed", description: "Could not create share link.", variant: "destructive" });
+    } finally {
+      setShareLoading(false);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    if (!shareUrl) return;
+    await navigator.clipboard.writeText(shareUrl);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
   const handleReset = () => {
     setFile(null);
     setFiles([]);
@@ -342,6 +377,9 @@ export function GenericTool({
     setShowConfetti(false);
     setRetryCount(0);
     setRetryingIn(null);
+    setShareUrl(null);
+    setShareLoading(false);
+    setLinkCopied(false);
     if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
   };
 
@@ -435,7 +473,7 @@ export function GenericTool({
           >
             <CheckCircle2 className="h-12 w-12" />
           </motion.div>
-          <h2 className="text-2xl font-bold">Ready to download!</h2>
+          <h2 className="text-2xl font-bold">{t("tool.ready")}</h2>
           <p className="text-muted-foreground max-w-md">
             {successMessage}
           </p>
@@ -450,8 +488,45 @@ export function GenericTool({
               {downloadLabel}
             </Button>
             <Button variant="outline" size="lg" onClick={handleReset} data-testid="button-process-another">
-              Process Another File
+              {t("tool.processAnother")}
             </Button>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="mt-4"
+          >
+            {!shareUrl ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleShare}
+                disabled={shareLoading}
+                data-testid="button-share"
+              >
+                {shareLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Share2 className="mr-2 h-4 w-4" />}
+                {t("tool.shareLink")}
+              </Button>
+            ) : (
+              <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                <input
+                  type="text"
+                  readOnly
+                  value={shareUrl}
+                  className="text-xs bg-transparent flex-1 outline-none min-w-0"
+                  data-testid="input-share-url"
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCopyLink}
+                  data-testid="button-copy-link"
+                >
+                  {linkCopied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
+            )}
           </motion.div>
         </motion.div>
       </ToolLayout>
@@ -483,9 +558,9 @@ export function GenericTool({
             >
               <Icon className={cn("h-12 w-12", colorClass.split(' ')[0])} />
             </motion.div>
-            <h3 className="text-xl font-semibold mb-2">Select file</h3>
-            <p className="text-muted-foreground mb-6">or drop file here</p>
-            <Button size="lg" className={buttonClass} data-testid="button-select-file">Select File</Button>
+            <h3 className="text-xl font-semibold mb-2">{t("tool.selectFile")}</h3>
+            <p className="text-muted-foreground mb-6">{t("tool.dropFile")}</p>
+            <Button size="lg" className={buttonClass} data-testid="button-select-file">{t("tool.selectFile")}</Button>
           </div>
         </motion.div>
       ) : (

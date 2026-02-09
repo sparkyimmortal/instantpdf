@@ -23,6 +23,7 @@ import (
         "time"
 
         "image"
+        "image/color"
         "image/draw"
         _ "image/gif"
         "image/jpeg"
@@ -103,6 +104,10 @@ func main() {
         mux.HandleFunc("/api/pdf/crop", handleCrop)
         mux.HandleFunc("/api/pdf/page-numbers", handlePageNumbers)
         mux.HandleFunc("/api/pdf/watermark", handleWatermark)
+
+        // Perspective Warp (document scanner)
+        mux.HandleFunc("/api/pdf/perspective-warp", handlePerspectiveWarp)
+        mux.HandleFunc("/pdf/perspective-warp", handlePerspectiveWarp)
 
         // PDF Security Tools
         mux.HandleFunc("/api/pdf/protect", handleProtectPDF)
@@ -436,30 +441,305 @@ func handleDocumentDetect(w http.ResponseWriter, r *http.Request) {
                 return
         }
 
-        detected, x, y, bw, bh := detectDocumentBounds(srcImg)
+        detected, corners := detectDocumentQuad(srcImg)
 
+        type cornerPoint struct {
+                X float64 `json:"x"`
+                Y float64 `json:"y"`
+        }
         type detectResult struct {
-                Detected bool    `json:"detected"`
-                X        float64 `json:"x"`
-                Y        float64 `json:"y"`
-                Width    float64 `json:"width"`
-                Height   float64 `json:"height"`
+                Detected    bool        `json:"detected"`
+                X           float64     `json:"x"`
+                Y           float64     `json:"y"`
+                Width       float64     `json:"width"`
+                Height      float64     `json:"height"`
+                TopLeft     cornerPoint `json:"topLeft"`
+                TopRight    cornerPoint `json:"topRight"`
+                BottomLeft  cornerPoint `json:"bottomLeft"`
+                BottomRight cornerPoint `json:"bottomRight"`
         }
 
+        if !detected {
+                writeJSON(w, http.StatusOK, detectResult{Detected: false})
+                return
+        }
+
+        minX := math.Min(math.Min(corners[0].x, corners[3].x), math.Min(corners[1].x, corners[2].x))
+        maxX := math.Max(math.Max(corners[0].x, corners[3].x), math.Max(corners[1].x, corners[2].x))
+        minY := math.Min(math.Min(corners[0].y, corners[1].y), math.Min(corners[2].y, corners[3].y))
+        maxY := math.Max(math.Max(corners[0].y, corners[1].y), math.Max(corners[2].y, corners[3].y))
+
         writeJSON(w, http.StatusOK, detectResult{
-                Detected: detected,
-                X:        x,
-                Y:        y,
-                Width:    bw,
-                Height:   bh,
+                Detected:    true,
+                X:           minX,
+                Y:           minY,
+                Width:       maxX - minX,
+                Height:      maxY - minY,
+                TopLeft:     cornerPoint{X: corners[0].x, Y: corners[0].y},
+                TopRight:    cornerPoint{X: corners[1].x, Y: corners[1].y},
+                BottomRight: cornerPoint{X: corners[2].x, Y: corners[2].y},
+                BottomLeft:  cornerPoint{X: corners[3].x, Y: corners[3].y},
         })
 }
 
-func detectDocumentBounds(src image.Image) (bool, float64, float64, float64, float64) {
+func handlePerspectiveWarp(w http.ResponseWriter, r *http.Request) {
+        if r.Method != http.MethodPost {
+                errorJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+                return
+        }
+        if err := r.ParseMultipartForm(50 << 20); err != nil {
+                errorJSON(w, http.StatusBadRequest, "invalid multipart form")
+                return
+        }
+
+        _, header, err := r.FormFile("image")
+        if err != nil {
+                errorJSON(w, http.StatusBadRequest, "image is required")
+                return
+        }
+        if !checkFileSize(w, r, header) {
+                return
+        }
+
+        file, err := header.Open()
+        if err != nil {
+                errorJSON(w, http.StatusInternalServerError, "failed to open image")
+                return
+        }
+        defer file.Close()
+
+        srcImg, _, err := image.Decode(file)
+        if err != nil {
+                errorJSON(w, http.StatusInternalServerError, "failed to decode image")
+                return
+        }
+
+        parseCorner := func(xKey, yKey string) (float64, float64, error) {
+                xStr := r.FormValue(xKey)
+                yStr := r.FormValue(yKey)
+                if xStr == "" || yStr == "" {
+                        return 0, 0, fmt.Errorf("missing %s or %s", xKey, yKey)
+                }
+                x, err := strconv.ParseFloat(xStr, 64)
+                if err != nil {
+                        return 0, 0, fmt.Errorf("invalid %s: %v", xKey, err)
+                }
+                y, err := strconv.ParseFloat(yStr, 64)
+                if err != nil {
+                        return 0, 0, fmt.Errorf("invalid %s: %v", yKey, err)
+                }
+                if x < 0 || x > 1 || y < 0 || y > 1 {
+                        return 0, 0, fmt.Errorf("%s/%s out of range [0,1]: %f, %f", xKey, yKey, x, y)
+                }
+                return x, y, nil
+        }
+
+        tlx, tly, err1 := parseCorner("topLeftX", "topLeftY")
+        trx, try2, err2 := parseCorner("topRightX", "topRightY")
+        blx, bly, err3 := parseCorner("bottomLeftX", "bottomLeftY")
+        brx, bry, err4 := parseCorner("bottomRightX", "bottomRightY")
+        if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
+                errorJSON(w, http.StatusBadRequest, "invalid or missing corner coordinates")
+                return
+        }
+
+        bounds := srcImg.Bounds()
+        imgW := float64(bounds.Dx())
+        imgH := float64(bounds.Dy())
+
+        srcCorners := [4]point2f{
+                {x: tlx * imgW, y: tly * imgH},
+                {x: trx * imgW, y: try2 * imgH},
+                {x: brx * imgW, y: bry * imgH},
+                {x: blx * imgW, y: bly * imgH},
+        }
+
+        area := math.Abs((srcCorners[0].x*(srcCorners[1].y-srcCorners[3].y) +
+                srcCorners[1].x*(srcCorners[2].y-srcCorners[0].y) +
+                srcCorners[2].x*(srcCorners[3].y-srcCorners[1].y) +
+                srcCorners[3].x*(srcCorners[0].y-srcCorners[2].y)) / 2.0)
+        if area < imgW*imgH*0.01 {
+                errorJSON(w, http.StatusBadRequest, "detected area too small")
+                return
+        }
+
+        topWidth := math.Sqrt(math.Pow(srcCorners[1].x-srcCorners[0].x, 2) + math.Pow(srcCorners[1].y-srcCorners[0].y, 2))
+        bottomWidth := math.Sqrt(math.Pow(srcCorners[2].x-srcCorners[3].x, 2) + math.Pow(srcCorners[2].y-srcCorners[3].y, 2))
+        leftHeight := math.Sqrt(math.Pow(srcCorners[3].x-srcCorners[0].x, 2) + math.Pow(srcCorners[3].y-srcCorners[0].y, 2))
+        rightHeight := math.Sqrt(math.Pow(srcCorners[2].x-srcCorners[1].x, 2) + math.Pow(srcCorners[2].y-srcCorners[1].y, 2))
+
+        outW := int(math.Max(topWidth, bottomWidth))
+        outH := int(math.Max(leftHeight, rightHeight))
+        if outW < 100 {
+                outW = 100
+        }
+        if outH < 100 {
+                outH = 100
+        }
+        if outW > 4000 {
+                outW = 4000
+        }
+        if outH > 4000 {
+                outH = 4000
+        }
+
+        dstCorners := [4]point2f{
+                {x: 0, y: 0},
+                {x: float64(outW), y: 0},
+                {x: float64(outW), y: float64(outH)},
+                {x: 0, y: float64(outH)},
+        }
+
+        result := image.NewRGBA(image.Rect(0, 0, outW, outH))
+        invTransform := computePerspectiveTransform(dstCorners, srcCorners)
+
+        for dy := 0; dy < outH; dy++ {
+                for dx := 0; dx < outW; dx++ {
+                        sx, sy := applyPerspectiveTransform(invTransform, float64(dx), float64(dy))
+                        if sx >= 0 && sx < imgW-1 && sy >= 0 && sy < imgH-1 {
+                                c := bilinearSample(srcImg, sx, sy)
+                                result.Set(dx, dy, c)
+                        }
+                }
+        }
+
+        var buf bytes.Buffer
+        if err := jpeg.Encode(&buf, result, &jpeg.Options{Quality: 95}); err != nil {
+                errorJSON(w, http.StatusInternalServerError, "failed to encode result")
+                return
+        }
+
+        w.Header().Set("Content-Type", "image/jpeg")
+        w.Header().Set("Content-Length", strconv.Itoa(buf.Len()))
+        w.WriteHeader(http.StatusOK)
+        w.Write(buf.Bytes())
+}
+
+func computePerspectiveTransform(src, dst [4]point2f) [9]float64 {
+        var a [8][8]float64
+        var b [8]float64
+
+        for i := 0; i < 4; i++ {
+                a[i*2][0] = src[i].x
+                a[i*2][1] = src[i].y
+                a[i*2][2] = 1
+                a[i*2][3] = 0
+                a[i*2][4] = 0
+                a[i*2][5] = 0
+                a[i*2][6] = -src[i].x * dst[i].x
+                a[i*2][7] = -src[i].y * dst[i].x
+                b[i*2] = dst[i].x
+
+                a[i*2+1][0] = 0
+                a[i*2+1][1] = 0
+                a[i*2+1][2] = 0
+                a[i*2+1][3] = src[i].x
+                a[i*2+1][4] = src[i].y
+                a[i*2+1][5] = 1
+                a[i*2+1][6] = -src[i].x * dst[i].y
+                a[i*2+1][7] = -src[i].y * dst[i].y
+                b[i*2+1] = dst[i].y
+        }
+
+        for col := 0; col < 8; col++ {
+                pivot := col
+                for row := col + 1; row < 8; row++ {
+                        if math.Abs(a[row][col]) > math.Abs(a[pivot][col]) {
+                                pivot = row
+                        }
+                }
+                a[col], a[pivot] = a[pivot], a[col]
+                b[col], b[pivot] = b[pivot], b[col]
+
+                if math.Abs(a[col][col]) < 1e-10 {
+                        continue
+                }
+
+                for row := col + 1; row < 8; row++ {
+                        factor := a[row][col] / a[col][col]
+                        for k := col; k < 8; k++ {
+                                a[row][k] -= factor * a[col][k]
+                        }
+                        b[row] -= factor * b[col]
+                }
+        }
+
+        var h [8]float64
+        for i := 7; i >= 0; i-- {
+                h[i] = b[i]
+                for j := i + 1; j < 8; j++ {
+                        h[i] -= a[i][j] * h[j]
+                }
+                if math.Abs(a[i][i]) > 1e-10 {
+                        h[i] /= a[i][i]
+                }
+        }
+
+        return [9]float64{h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1}
+}
+
+func applyPerspectiveTransform(h [9]float64, x, y float64) (float64, float64) {
+        w := h[6]*x + h[7]*y + h[8]
+        if math.Abs(w) < 1e-10 {
+                return 0, 0
+        }
+        nx := (h[0]*x + h[1]*y + h[2]) / w
+        ny := (h[3]*x + h[4]*y + h[5]) / w
+        return nx, ny
+}
+
+func bilinearSample(img image.Image, x, y float64) color.RGBA {
+        x0 := int(math.Floor(x))
+        y0 := int(math.Floor(y))
+        x1 := x0 + 1
+        y1 := y0 + 1
+
+        bounds := img.Bounds()
+        if x1 >= bounds.Max.X {
+                x1 = bounds.Max.X - 1
+        }
+        if y1 >= bounds.Max.Y {
+                y1 = bounds.Max.Y - 1
+        }
+        if x0 < bounds.Min.X {
+                x0 = bounds.Min.X
+        }
+        if y0 < bounds.Min.Y {
+                y0 = bounds.Min.Y
+        }
+
+        fx := x - float64(x0)
+        fy := y - float64(y0)
+
+        r00, g00, b00, a00 := img.At(x0, y0).RGBA()
+        r10, g10, b10, a10 := img.At(x1, y0).RGBA()
+        r01, g01, b01, a01 := img.At(x0, y1).RGBA()
+        r11, g11, b11, a11 := img.At(x1, y1).RGBA()
+
+        lerp := func(a, b, c, d uint32, fx, fy float64) uint8 {
+                top := float64(a)*(1-fx) + float64(b)*fx
+                bot := float64(c)*(1-fx) + float64(d)*fx
+                val := top*(1-fy) + bot*fy
+                return uint8(val / 256)
+        }
+
+        return color.RGBA{
+                R: lerp(r00, r10, r01, r11, fx, fy),
+                G: lerp(g00, g10, g01, g11, fx, fy),
+                B: lerp(b00, b10, b01, b11, fx, fy),
+                A: lerp(a00, a10, a01, a11, fx, fy),
+        }
+}
+
+type point2f struct {
+        x, y float64
+}
+
+func detectDocumentQuad(src image.Image) (bool, [4]point2f) {
         bounds := src.Bounds()
         origW, origH := bounds.Dx(), bounds.Dy()
 
-        maxDim := 200
+        maxDim := 300
         scale := 1.0
         if origW > maxDim || origH > maxDim {
                 if origW > origH {
@@ -496,35 +776,406 @@ func detectDocumentBounds(src image.Image) (bool, float64, float64, float64, flo
 
         blurred := docGaussianBlur(gray, sw, sh)
         edgeMag := docSobelEdges(blurred, sw, sh)
-        thresh := docOtsuThreshold(blurred, sw, sh)
 
-        binary := make([][]bool, sh)
+        edgeMax := 0.0
         for y := 0; y < sh; y++ {
-                binary[y] = make([]bool, sw)
                 for x := 0; x < sw; x++ {
-                        binary[y][x] = blurred[y][x] > thresh
+                        if edgeMag[y][x] > edgeMax {
+                                edgeMax = edgeMag[y][x]
+                        }
+                }
+        }
+        if edgeMax < 0.001 {
+                return false, [4]point2f{}
+        }
+
+        edgeThreshHigh := edgeMax * 0.15
+        edgeThreshLow := edgeMax * 0.08
+
+        edgeBinary := make([][]bool, sh)
+        for y := 0; y < sh; y++ {
+                edgeBinary[y] = make([]bool, sw)
+                for x := 0; x < sw; x++ {
+                        edgeBinary[y][x] = edgeMag[y][x] > edgeThreshHigh
                 }
         }
 
-        closed := docMorphClose(binary, sw, sh, 5)
-        bestX, bestY, bestW, bestH := docFindLargestComponent(closed, sw, sh)
-
-        detectedArea := float64(bestW*bestH) / float64(sw*sh)
-        if detectedArea < 0.04 {
-                bestX, bestY, bestW, bestH = docFindByEdgeProjection(edgeMag, sw, sh)
-                detectedArea = float64(bestW*bestH) / float64(sw*sh)
+        changed := true
+        for changed {
+                changed = false
+                for y := 1; y < sh-1; y++ {
+                        for x := 1; x < sw-1; x++ {
+                                if edgeBinary[y][x] || edgeMag[y][x] <= edgeThreshLow {
+                                        continue
+                                }
+                                for dy := -1; dy <= 1; dy++ {
+                                        for dx := -1; dx <= 1; dx++ {
+                                                if edgeBinary[y+dy][x+dx] {
+                                                        edgeBinary[y][x] = true
+                                                        changed = true
+                                                        break
+                                                }
+                                        }
+                                        if edgeBinary[y][x] {
+                                                break
+                                        }
+                                }
+                        }
+                }
         }
 
-        if detectedArea < 0.04 || detectedArea > 0.96 || bestW < 10 || bestH < 10 {
-                return false, 0, 0, 0, 0
+        dilated := docMorphDilate(edgeBinary, sw, sh, 2)
+
+        contours := docFindContours(dilated, sw, sh)
+
+        bestQuad, found := docFindBestQuad(contours, sw, sh)
+        if !found {
+                thresh := docOtsuThreshold(blurred, sw, sh)
+                binary := make([][]bool, sh)
+                for y := 0; y < sh; y++ {
+                        binary[y] = make([]bool, sw)
+                        for x := 0; x < sw; x++ {
+                                binary[y][x] = blurred[y][x] > thresh
+                        }
+                }
+                closed := docMorphClose(binary, sw, sh, 3)
+                contours2 := docFindContours(closed, sw, sh)
+                bestQuad, found = docFindBestQuad(contours2, sw, sh)
         }
 
-        nx := float64(bestX) / float64(sw)
-        ny := float64(bestY) / float64(sh)
-        nw := float64(bestW) / float64(sw)
-        nh := float64(bestH) / float64(sh)
+        if !found {
+                return false, [4]point2f{}
+        }
 
-        return true, nx, ny, nw, nh
+        var corners [4]point2f
+        for i, p := range bestQuad {
+                corners[i] = point2f{
+                        x: float64(p.x) / float64(sw),
+                        y: float64(p.y) / float64(sh),
+                }
+        }
+
+        corners = orderCorners(corners)
+
+        area := quadArea(corners)
+        if area < 0.05 || area > 0.92 {
+                return false, [4]point2f{}
+        }
+
+        return true, corners
+}
+
+func quadArea(c [4]point2f) float64 {
+        a1 := 0.5 * math.Abs(
+                (c[1].x-c[0].x)*(c[2].y-c[0].y)-(c[2].x-c[0].x)*(c[1].y-c[0].y))
+        a2 := 0.5 * math.Abs(
+                (c[2].x-c[0].x)*(c[3].y-c[0].y)-(c[3].x-c[0].x)*(c[2].y-c[0].y))
+        return a1 + a2
+}
+
+func orderCorners(pts [4]point2f) [4]point2f {
+        cx := (pts[0].x + pts[1].x + pts[2].x + pts[3].x) / 4
+        cy := (pts[0].y + pts[1].y + pts[2].y + pts[3].y) / 4
+
+        var tl, tr, bl, br point2f
+        for _, p := range pts {
+                if p.x < cx && p.y < cy {
+                        tl = p
+                } else if p.x >= cx && p.y < cy {
+                        tr = p
+                } else if p.x < cx && p.y >= cy {
+                        bl = p
+                } else {
+                        br = p
+                }
+        }
+        return [4]point2f{tl, tr, br, bl}
+}
+
+func docMorphDilate(binary [][]bool, w, h, radius int) [][]bool {
+        out := make([][]bool, h)
+        for y := 0; y < h; y++ {
+                out[y] = make([]bool, w)
+                for x := 0; x < w; x++ {
+                        if binary[y][x] {
+                                out[y][x] = true
+                                continue
+                        }
+                        found := false
+                        for dy := -radius; dy <= radius && !found; dy++ {
+                                for dx := -radius; dx <= radius && !found; dx++ {
+                                        ny2, nx2 := y+dy, x+dx
+                                        if ny2 >= 0 && ny2 < h && nx2 >= 0 && nx2 < w && binary[ny2][nx2] {
+                                                found = true
+                                        }
+                                }
+                        }
+                        out[y][x] = found
+                }
+        }
+        return out
+}
+
+func docFindContours(binary [][]bool, w, h int) [][]struct{ x, y int } {
+        visited := make([][]bool, h)
+        for y := 0; y < h; y++ {
+                visited[y] = make([]bool, w)
+        }
+
+        var contours [][]struct{ x, y int }
+
+        for sy := 0; sy < h; sy++ {
+                for sx := 0; sx < w; sx++ {
+                        if visited[sy][sx] || !binary[sy][sx] {
+                                continue
+                        }
+
+                        var contour []struct{ x, y int }
+                        queue := []struct{ x, y int }{{sx, sy}}
+                        visited[sy][sx] = true
+
+                        for len(queue) > 0 {
+                                p := queue[0]
+                                queue = queue[1:]
+
+                                isBorder := false
+                                for _, d := range [][2]int{{-1, 0}, {1, 0}, {0, -1}, {0, 1}} {
+                                        nx2, ny2 := p.x+d[0], p.y+d[1]
+                                        if nx2 < 0 || nx2 >= w || ny2 < 0 || ny2 >= h || !binary[ny2][nx2] {
+                                                isBorder = true
+                                        } else if !visited[ny2][nx2] {
+                                                visited[ny2][nx2] = true
+                                                queue = append(queue, struct{ x, y int }{nx2, ny2})
+                                        }
+                                }
+                                if isBorder {
+                                        contour = append(contour, p)
+                                }
+                        }
+
+                        if len(contour) > 20 {
+                                contours = append(contours, contour)
+                        }
+                }
+        }
+
+        return contours
+}
+
+func docFindBestQuad(contours [][]struct{ x, y int }, imgW, imgH int) ([4]struct{ x, y int }, bool) {
+        bestArea := 0.0
+        var bestQuad [4]struct{ x, y int }
+        found := false
+
+        totalPixels := float64(imgW * imgH)
+        minArea := totalPixels * 0.05
+        maxArea := totalPixels * 0.92
+
+        for _, contour := range contours {
+                if len(contour) < 4 {
+                        continue
+                }
+
+                hull := convexHull(contour)
+                if len(hull) < 4 {
+                        continue
+                }
+
+                approx := approxPoly(hull, float64(len(hull))*0.015+2.0)
+
+                if len(approx) < 4 || len(approx) > 8 {
+                        if len(approx) > 8 {
+                                approx = approxPoly(hull, float64(len(hull))*0.03+4.0)
+                        }
+                        if len(approx) < 4 || len(approx) > 6 {
+                                continue
+                        }
+                }
+
+                var quad [4]struct{ x, y int }
+                if len(approx) == 4 {
+                        copy(quad[:], approx[:4])
+                } else {
+                        quad = pickBest4(approx)
+                }
+
+                area := quadAreaInt(quad)
+                if area < minArea || area > maxArea {
+                        continue
+                }
+
+                if !isReasonableQuad(quad, imgW, imgH) {
+                        continue
+                }
+
+                if area > bestArea {
+                        bestArea = area
+                        bestQuad = quad
+                        found = true
+                }
+        }
+
+        return bestQuad, found
+}
+
+func convexHull(points []struct{ x, y int }) []struct{ x, y int } {
+        n := len(points)
+        if n < 3 {
+                return points
+        }
+
+        sorted := make([]struct{ x, y int }, n)
+        copy(sorted, points)
+        sort.Slice(sorted, func(i, j int) bool {
+                if sorted[i].x != sorted[j].x {
+                        return sorted[i].x < sorted[j].x
+                }
+                return sorted[i].y < sorted[j].y
+        })
+
+        var hull []struct{ x, y int }
+
+        for _, p := range sorted {
+                for len(hull) >= 2 && cross(hull[len(hull)-2], hull[len(hull)-1], p) <= 0 {
+                        hull = hull[:len(hull)-1]
+                }
+                hull = append(hull, p)
+        }
+
+        lower := len(hull) + 1
+        for i := n - 2; i >= 0; i-- {
+                p := sorted[i]
+                for len(hull) >= lower && cross(hull[len(hull)-2], hull[len(hull)-1], p) <= 0 {
+                        hull = hull[:len(hull)-1]
+                }
+                hull = append(hull, p)
+        }
+
+        return hull[:len(hull)-1]
+}
+
+func cross(o, a, b struct{ x, y int }) int {
+        return (a.x-o.x)*(b.y-o.y) - (a.y-o.y)*(b.x-o.x)
+}
+
+func approxPoly(pts []struct{ x, y int }, epsilon float64) []struct{ x, y int } {
+        if len(pts) < 2 {
+                return pts
+        }
+
+        dmax := 0.0
+        idx := 0
+        end := len(pts) - 1
+        for i := 1; i < end; i++ {
+                d := pointLineDistance(pts[i], pts[0], pts[end])
+                if d > dmax {
+                        dmax = d
+                        idx = i
+                }
+        }
+
+        if dmax > epsilon {
+                left := approxPoly(pts[:idx+1], epsilon)
+                right := approxPoly(pts[idx:], epsilon)
+                return append(left[:len(left)-1], right...)
+        }
+        return []struct{ x, y int }{pts[0], pts[end]}
+}
+
+func pointLineDistance(p, a, b struct{ x, y int }) float64 {
+        num := math.Abs(float64((b.y-a.y)*p.x-(b.x-a.x)*p.y+b.x*a.y-b.y*a.x))
+        den := math.Sqrt(float64((b.y-a.y)*(b.y-a.y) + (b.x-a.x)*(b.x-a.x)))
+        if den < 0.001 {
+                return math.Sqrt(float64((p.x-a.x)*(p.x-a.x) + (p.y-a.y)*(p.y-a.y)))
+        }
+        return num / den
+}
+
+func pickBest4(pts []struct{ x, y int }) [4]struct{ x, y int } {
+        n := len(pts)
+        if n <= 4 {
+                var out [4]struct{ x, y int }
+                for i := 0; i < 4 && i < n; i++ {
+                        out[i] = pts[i]
+                }
+                return out
+        }
+
+        bestArea := 0.0
+        var best [4]struct{ x, y int }
+        for i := 0; i < n; i++ {
+                for j := i + 1; j < n; j++ {
+                        for k := j + 1; k < n; k++ {
+                                for l := k + 1; l < n; l++ {
+                                        q := [4]struct{ x, y int }{pts[i], pts[j], pts[k], pts[l]}
+                                        a := quadAreaInt(q)
+                                        if a > bestArea {
+                                                bestArea = a
+                                                best = q
+                                        }
+                                }
+                        }
+                }
+        }
+        return best
+}
+
+func quadAreaInt(q [4]struct{ x, y int }) float64 {
+        a1 := 0.5 * math.Abs(float64(
+                (q[1].x-q[0].x)*(q[2].y-q[0].y)-(q[2].x-q[0].x)*(q[1].y-q[0].y)))
+        a2 := 0.5 * math.Abs(float64(
+                (q[2].x-q[0].x)*(q[3].y-q[0].y)-(q[3].x-q[0].x)*(q[2].y-q[0].y)))
+        return a1 + a2
+}
+
+func isReasonableQuad(q [4]struct{ x, y int }, imgW, imgH int) bool {
+        for _, p := range q {
+                if p.x < 0 || p.x >= imgW || p.y < 0 || p.y >= imgH {
+                        return false
+                }
+        }
+
+        minSide := math.MaxFloat64
+        maxSide := 0.0
+        for i := 0; i < 4; i++ {
+                j := (i + 1) % 4
+                dx := float64(q[j].x - q[i].x)
+                dy := float64(q[j].y - q[i].y)
+                side := math.Sqrt(dx*dx + dy*dy)
+                if side < minSide {
+                        minSide = side
+                }
+                if side > maxSide {
+                        maxSide = side
+                }
+        }
+
+        if minSide < 15 {
+                return false
+        }
+        if maxSide > 0 && minSide/maxSide < 0.1 {
+                return false
+        }
+
+        for i := 0; i < 4; i++ {
+                a := q[i]
+                b := q[(i+1)%4]
+                c := q[(i+2)%4]
+                ab := point2f{x: float64(b.x - a.x), y: float64(b.y - a.y)}
+                bc := point2f{x: float64(c.x - b.x), y: float64(c.y - b.y)}
+                dot := ab.x*bc.x + ab.y*bc.y
+                magAB := math.Sqrt(ab.x*ab.x + ab.y*ab.y)
+                magBC := math.Sqrt(bc.x*bc.x + bc.y*bc.y)
+                if magAB < 0.001 || magBC < 0.001 {
+                        return false
+                }
+                cosAngle := dot / (magAB * magBC)
+                if math.Abs(cosAngle) > 0.7 {
+                        return false
+                }
+        }
+
+        return true
 }
 
 func detectAndCropDocument(src image.Image) image.Image {
@@ -2306,7 +2957,31 @@ func convertToJPEG(dir string, imgPath string, index int) (string, error) {
                 }
                 return jpgPath, nil
         }
-        return imgPath, nil
+        if ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".gif" {
+                f, err := os.Open(imgPath)
+                if err != nil {
+                        return imgPath, nil
+                }
+                _, _, err = image.DecodeConfig(f)
+                f.Close()
+                if err == nil {
+                        return imgPath, nil
+                }
+                log.Printf("image decode failed for %s, attempting ImageMagick convert", imgPath)
+                jpgPath := filepath.Join(dir, fmt.Sprintf("converted_%d.jpg", index))
+                args := []string{imgPath, "-quality", "95", jpgPath}
+                if cerr := runCommand(dir, "convert", args...); cerr != nil {
+                        return imgPath, nil
+                }
+                return jpgPath, nil
+        }
+        jpgPath := filepath.Join(dir, fmt.Sprintf("converted_%d.jpg", index))
+        args := []string{imgPath, "-quality", "95", jpgPath}
+        if err := runCommand(dir, "convert", args...); err != nil {
+                log.Printf("fallback convert failed for %s: %v", imgPath, err)
+                return imgPath, nil
+        }
+        return jpgPath, nil
 }
 
 func getPageDimensions(pageSize string) (float64, float64) {
@@ -2467,7 +3142,7 @@ func handleImageToPDF(w http.ResponseWriter, r *http.Request) {
                                 } else if ext == ".gif" {
                                         imgType = "GIF"
                                 }
-                                opt := gofpdf.ImageOptions{ImageType: imgType, ReadDpi: true}
+                                opt := gofpdf.ImageOptions{ImageType: imgType, ReadDpi: false}
                                 pdf.ImageOptions(imgPath, x, y, drawW, drawH, false, opt, 0, "")
                         }
                 }
@@ -2515,7 +3190,7 @@ func handleImageToPDF(w http.ResponseWriter, r *http.Request) {
                                 imgType = "JPEG"
                         }
 
-                        opt := gofpdf.ImageOptions{ImageType: imgType, ReadDpi: true}
+                        opt := gofpdf.ImageOptions{ImageType: imgType, ReadDpi: false}
                         pdf.ImageOptions(imgPath, x, y, drawW, drawH, false, opt, 0, "")
                 }
         }

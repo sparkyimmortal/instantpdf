@@ -4360,8 +4360,8 @@ func handlePDFToJPG(w http.ResponseWriter, r *http.Request) {
                 return
         }
 
-        // Optional DPI parameter (default 150)
-        dpi := parseIntDefault(r.FormValue("dpi"), 150)
+        // Optional DPI parameter (default 300)
+        dpi := parseIntDefault(r.FormValue("dpi"), 300)
         if dpi < 72 {
                 dpi = 72
         }
@@ -6097,7 +6097,7 @@ func handlePDFToTIFF(w http.ResponseWriter, r *http.Request) {
 
         dpi := r.FormValue("dpi")
         if dpi == "" {
-                dpi = "150"
+                dpi = "300"
         }
 
         if err := runCommand(dir, "gs",
@@ -6568,7 +6568,7 @@ func handleBatchProcess(w http.ResponseWriter, r *http.Request) {
                 case "to-jpg":
                         pageOutDir := filepath.Join(dir, fmt.Sprintf("jpgout_%d", i))
                         os.MkdirAll(pageOutDir, 0o755)
-                        cmdErr = runCommand(dir, "pdftoppm", "-jpeg", "-r", "200", inPath, filepath.Join(pageOutDir, "page"))
+                        cmdErr = runCommand(dir, "pdftoppm", "-jpeg", "-r", "300", inPath, filepath.Join(pageOutDir, "page"))
                         if cmdErr == nil {
                                 jpgFiles, _ := filepath.Glob(filepath.Join(pageOutDir, "*.jpg"))
                                 if len(jpgFiles) == 0 {
